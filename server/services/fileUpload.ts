@@ -1,10 +1,10 @@
-import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
-import { randomUUID } from 'crypto';
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import { randomUUID } from "crypto";
 
 // Ensure uploads directory exists
-const uploadsDir = path.join(process.cwd(), 'uploads');
+const uploadsDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
@@ -15,24 +15,30 @@ const storage = multer.diskStorage({
     cb(null, uploadsDir);
   },
   filename: (req, file, cb) => {
-    const uniqueName = `${randomUUID()}-${Date.now()}${path.extname(file.originalname)}`;
+    const uniqueName = `${randomUUID()}-${Date.now()}${path.extname(
+      file.originalname
+    )}`;
     cb(null, uniqueName);
-  }
+  },
 });
 
-const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+const fileFilter = (
+  req: any,
+  file: Express.Multer.File,
+  cb: multer.FileFilterCallback
+) => {
   // Allow specific file types
   const allowedTypes = [
-    'application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.ms-powerpoint',
-    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    'image/jpeg',
-    'image/png',
-    'image/gif',
-    'image/webp',
-    'text/plain',
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+    "text/plain",
   ];
 
   if (allowedTypes.includes(file.mimetype)) {
@@ -46,7 +52,10 @@ export const upload = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
+    fileSize: 50 * 1024 * 1024, // 50MB limit
+    fieldSize: 10 * 1024 * 1024, // 10MB for form fields
+    fields: 20, // Maximum number of fields
+    files: 10, // Maximum number of files
   },
 });
 
@@ -67,7 +76,7 @@ export function deleteFile(filename: string): boolean {
     }
     return false;
   } catch (error) {
-    console.error('Error deleting file:', error);
+    console.error("Error deleting file:", error);
     return false;
   }
 }

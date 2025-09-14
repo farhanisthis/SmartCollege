@@ -1,4 +1,13 @@
-import { type User, type InsertUser, type Update, type InsertUpdate, type File, type InsertFile, type UpdateWithAuthor, type DashboardStats } from "@shared/schema";
+import {
+  type User,
+  type InsertUser,
+  type Update,
+  type InsertUpdate,
+  type File,
+  type InsertFile,
+  type UpdateWithAuthor,
+  type DashboardStats,
+} from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -6,26 +15,34 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  
+
   // Update methods
-  getUpdates(filters?: { category?: string; authorId?: string; limit?: number; offset?: number }): Promise<UpdateWithAuthor[]>;
+  getUpdates(filters?: {
+    category?: string;
+    authorId?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<UpdateWithAuthor[]>;
   getUpdate(id: string): Promise<UpdateWithAuthor | undefined>;
   createUpdate(update: InsertUpdate): Promise<Update>;
-  updateUpdate(id: string, update: Partial<InsertUpdate>): Promise<Update | undefined>;
+  updateUpdate(
+    id: string,
+    update: Partial<InsertUpdate>
+  ): Promise<Update | undefined>;
   deleteUpdate(id: string): Promise<boolean>;
   incrementViewCount(id: string): Promise<void>;
   incrementDownloadCount(id: string): Promise<void>;
-  
+
   // File methods
   createFile(file: InsertFile): Promise<File>;
   getFilesByUpdateId(updateId: string): Promise<File[]>;
   getAllFiles(): Promise<File[]>;
   getFile(id: string): Promise<File | undefined>;
   deleteFile(id: string): Promise<boolean>;
-  
+
   // Stats methods
   getDashboardStats(): Promise<DashboardStats>;
-  
+
   // User views
   markAsViewed(userId: string, updateId: string): Promise<void>;
   hasUserViewed(userId: string, updateId: string): Promise<boolean>;
@@ -35,14 +52,17 @@ export class MemStorage implements IStorage {
   private users: Map<string, User>;
   private updates: Map<string, Update>;
   private files: Map<string, File>;
-  private userViews: Map<string, { userId: string; updateId: string; viewedAt: Date }>;
+  private userViews: Map<
+    string,
+    { userId: string; updateId: string; viewedAt: Date }
+  >;
 
   constructor() {
     this.users = new Map();
     this.updates = new Map();
     this.files = new Map();
     this.userViews = new Map();
-    
+
     // Initialize with sample users
     this.initializeSampleData();
   }
@@ -79,13 +99,13 @@ export class MemStorage implements IStorage {
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     return Array.from(this.users.values()).find(
-      (user) => user.username === username,
+      (user) => user.username === username
     );
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = randomUUID();
-    const user: User = { 
+    const user: User = {
       ...insertUser,
       role: insertUser.role || "student", // Ensure role has default value
       id,
@@ -95,32 +115,44 @@ export class MemStorage implements IStorage {
     return user;
   }
 
-  async getUpdates(filters?: { category?: string; authorId?: string; limit?: number; offset?: number }): Promise<UpdateWithAuthor[]> {
+  async getUpdates(filters?: {
+    category?: string;
+    authorId?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<UpdateWithAuthor[]> {
     let updatesArray = Array.from(this.updates.values());
-    
+
     // Apply filters
-    if (filters?.category && filters.category !== 'all') {
-      updatesArray = updatesArray.filter(update => update.category === filters.category);
+    if (filters?.category && filters.category !== "all") {
+      updatesArray = updatesArray.filter(
+        (update) => update.category === filters.category
+      );
     }
-    
+
     if (filters?.authorId) {
-      updatesArray = updatesArray.filter(update => update.authorId === filters.authorId);
+      updatesArray = updatesArray.filter(
+        (update) => update.authorId === filters.authorId
+      );
     }
-    
+
     // Sort by creation date (newest first)
-    updatesArray.sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime());
-    
+    updatesArray.sort(
+      (a, b) =>
+        new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime()
+    );
+
     // Apply pagination
     const offset = filters?.offset || 0;
     const limit = filters?.limit || 50;
     updatesArray = updatesArray.slice(offset, offset + limit);
-    
+
     // Enrich with author and files
     const enrichedUpdates: UpdateWithAuthor[] = [];
     for (const update of updatesArray) {
       const author = await this.getUser(update.authorId);
       const files = await this.getFilesByUpdateId(update.id);
-      
+
       if (author) {
         enrichedUpdates.push({
           ...update,
@@ -133,19 +165,19 @@ export class MemStorage implements IStorage {
         });
       }
     }
-    
+
     return enrichedUpdates;
   }
 
   async getUpdate(id: string): Promise<UpdateWithAuthor | undefined> {
     const update = this.updates.get(id);
     if (!update) return undefined;
-    
+
     const author = await this.getUser(update.authorId);
     const files = await this.getFilesByUpdateId(update.id);
-    
+
     if (!author) return undefined;
-    
+
     return {
       ...update,
       author: {
@@ -162,7 +194,11 @@ export class MemStorage implements IStorage {
     const now = new Date();
     const update: Update = {
       ...insertUpdate,
-      originalContent: insertUpdate.originalContent || null, // Ensure originalContent is properly typed
+      originalContent: insertUpdate.originalContent || null,
+      priority: insertUpdate.priority || null,
+      tags: insertUpdate.tags || null,
+      isUrgent: insertUpdate.isUrgent || null,
+      dueDate: insertUpdate.dueDate || null,
       id,
       viewCount: 0,
       downloadCount: 0,
@@ -173,10 +209,13 @@ export class MemStorage implements IStorage {
     return update;
   }
 
-  async updateUpdate(id: string, updateData: Partial<InsertUpdate>): Promise<Update | undefined> {
+  async updateUpdate(
+    id: string,
+    updateData: Partial<InsertUpdate>
+  ): Promise<Update | undefined> {
     const existing = this.updates.get(id);
     if (!existing) return undefined;
-    
+
     const updated: Update = {
       ...existing,
       ...updateData,
@@ -218,7 +257,9 @@ export class MemStorage implements IStorage {
   }
 
   async getFilesByUpdateId(updateId: string): Promise<File[]> {
-    return Array.from(this.files.values()).filter(file => file.updateId === updateId);
+    return Array.from(this.files.values()).filter(
+      (file) => file.updateId === updateId
+    );
   }
 
   async getAllFiles(): Promise<File[]> {
@@ -237,20 +278,21 @@ export class MemStorage implements IStorage {
     const updates = Array.from(this.updates.values());
     const now = new Date();
     const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    
-    const thisWeekUpdates = updates.filter(update => 
-      update.createdAt && new Date(update.createdAt) >= weekAgo
+
+    const thisWeekUpdates = updates.filter(
+      (update) => update.createdAt && new Date(update.createdAt) >= weekAgo
     );
-    
+
     return {
       totalUpdates: updates.length,
       thisWeek: thisWeekUpdates.length,
       counts: {
         all: updates.length,
-        assignments: updates.filter(u => u.category === 'assignments').length,
-        notes: updates.filter(u => u.category === 'notes').length,
-        presentations: updates.filter(u => u.category === 'presentations').length,
-        general: updates.filter(u => u.category === 'general').length,
+        assignments: updates.filter((u) => u.category === "assignments").length,
+        notes: updates.filter((u) => u.category === "notes").length,
+        presentations: updates.filter((u) => u.category === "presentations")
+          .length,
+        general: updates.filter((u) => u.category === "general").length,
       },
     };
   }

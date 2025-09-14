@@ -1,52 +1,70 @@
-import { useCallback, useState } from 'react';
-import { useDropzone } from 'react-dropzone';
-import { Button } from '@/components/ui/button';
-import { CloudUpload, File, X } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { useCallback, useState } from "react";
+import { useDropzone } from "react-dropzone";
+import { Button } from "@/components/ui/button";
+import { CloudUpload, File, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+// Helper function to format file size
+const formatFileSize = (bytes: number): string => {
+  if (bytes === 0) return "0 Bytes";
+  const k = 1024;
+  const sizes = ["Bytes", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+};
 
 interface FileUploadProps {
   onFilesChange: (files: File[]) => void;
-  acceptedTypes?: 'image' | 'document' | 'all';
+  acceptedTypes?: "image" | "document" | "all";
   maxFiles?: number;
   maxSize?: number; // in MB
 }
 
 const acceptedTypesMap = {
   image: {
-    'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp']
+    "image/*": [".png", ".jpg", ".jpeg", ".gif", ".webp"],
   },
   document: {
-    'application/pdf': ['.pdf'],
-    'application/msword': ['.doc'],
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-    'application/vnd.ms-powerpoint': ['.ppt'],
-    'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['.pptx'],
-    'text/plain': ['.txt']
+    "application/pdf": [".pdf"],
+    "application/msword": [".doc"],
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [
+      ".docx",
+    ],
+    "application/vnd.ms-powerpoint": [".ppt"],
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation":
+      [".pptx"],
+    "text/plain": [".txt"],
   },
   all: {
-    'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp'],
-    'application/pdf': ['.pdf'],
-    'application/msword': ['.doc'],
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-    'application/vnd.ms-powerpoint': ['.ppt'],
-    'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['.pptx'],
-    'text/plain': ['.txt']
-  }
+    "image/*": [".png", ".jpg", ".jpeg", ".gif", ".webp"],
+    "application/pdf": [".pdf"],
+    "application/msword": [".doc"],
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [
+      ".docx",
+    ],
+    "application/vnd.ms-powerpoint": [".ppt"],
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation":
+      [".pptx"],
+    "text/plain": [".txt"],
+  },
 };
 
 export default function FileUpload({
   onFilesChange,
-  acceptedTypes = 'all',
-  maxFiles = 5,
-  maxSize = 10
+  acceptedTypes = "all",
+  maxFiles = 10, // Increased from 5 to 10
+  maxSize = 50, // Increased from 10 to 50MB
 }: FileUploadProps) {
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    const newFiles = [...uploadedFiles, ...acceptedFiles].slice(0, maxFiles);
-    setUploadedFiles(newFiles);
-    onFilesChange(newFiles);
-  }, [uploadedFiles, maxFiles, onFilesChange]);
+  const onDrop = useCallback(
+    (acceptedFiles: File[]) => {
+      const newFiles = [...uploadedFiles, ...acceptedFiles].slice(0, maxFiles);
+      setUploadedFiles(newFiles);
+      onFilesChange(newFiles);
+    },
+    [uploadedFiles, maxFiles, onFilesChange]
+  );
 
   const removeFile = (index: number) => {
     const newFiles = uploadedFiles.filter((_, i) => i !== index);
@@ -54,22 +72,23 @@ export default function FileUpload({
     onFilesChange(newFiles);
   };
 
-  const { getRootProps, getInputProps, isDragActive, fileRejections } = useDropzone({
-    onDrop,
-    accept: acceptedTypesMap[acceptedTypes],
-    maxSize: maxSize * 1024 * 1024, // Convert MB to bytes
-    maxFiles: maxFiles - uploadedFiles.length,
-    disabled: uploadedFiles.length >= maxFiles
-  });
+  const { getRootProps, getInputProps, isDragActive, fileRejections } =
+    useDropzone({
+      onDrop,
+      accept: acceptedTypesMap[acceptedTypes],
+      maxSize: maxSize * 1024 * 1024, // Convert MB to bytes
+      maxFiles: maxFiles - uploadedFiles.length,
+      disabled: uploadedFiles.length >= maxFiles,
+    });
 
   const getAcceptedTypesText = () => {
     switch (acceptedTypes) {
-      case 'image':
-        return 'PNG, JPG, GIF up to 10MB';
-      case 'document':
-        return 'PDF, DOC, PPT up to 10MB';
+      case "image":
+        return `PNG, JPG, GIF up to ${maxSize}MB`;
+      case "document":
+        return `PDF, DOC, PPT up to ${maxSize}MB`;
       default:
-        return 'PDF, DOC, PPT, images up to 10MB';
+        return `PDF, DOC, PPT, images up to ${maxSize}MB`;
     }
   };
 
@@ -80,7 +99,9 @@ export default function FileUpload({
         {...getRootProps()}
         className={cn(
           "border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer",
-          isDragActive ? "border-primary/50 bg-primary/5" : "border-border hover:border-primary/50",
+          isDragActive
+            ? "border-primary/50 bg-primary/5"
+            : "border-border hover:border-primary/50",
           uploadedFiles.length >= maxFiles && "opacity-50 cursor-not-allowed"
         )}
         data-testid="drop-zone"
@@ -93,13 +114,18 @@ export default function FileUpload({
           <div>
             <p className="text-sm text-foreground">
               {isDragActive
-                ? 'Drop files here...'
+                ? "Drop files here..."
                 : uploadedFiles.length >= maxFiles
-                ? 'Maximum files reached'
-                : 'Drag and drop files here, or'}
+                ? "Maximum files reached"
+                : "Drag and drop files here, or"}
             </p>
             {uploadedFiles.length < maxFiles && (
-              <Button type="button" variant="link" className="p-0 h-auto" data-testid="browse-button">
+              <Button
+                type="button"
+                variant="link"
+                className="p-0 h-auto"
+                data-testid="browse-button"
+              >
                 browse
               </Button>
             )}
@@ -115,7 +141,7 @@ export default function FileUpload({
         <div className="space-y-1" data-testid="file-errors">
           {fileRejections.map(({ file, errors }, index) => (
             <p key={index} className="text-xs text-destructive">
-              {file.name}: {errors.map(e => e.message).join(', ')}
+              {file.name}: {errors.map((e) => e.message).join(", ")}
             </p>
           ))}
         </div>
@@ -135,7 +161,7 @@ export default function FileUpload({
                 <File className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm truncate">{file.name}</span>
                 <span className="text-xs text-muted-foreground">
-                  ({(file.size / 1024 / 1024).toFixed(1)} MB)
+                  ({formatFileSize(file.size)})
                 </span>
               </div>
               <Button

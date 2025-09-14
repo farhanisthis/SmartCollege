@@ -1,44 +1,105 @@
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import Header from '@/components/layout/header';
-import Sidebar from '@/components/layout/sidebar';
-import UpdateCard from '@/components/updates/update-card';
-import CreateUpdateModal from '@/components/updates/create-update-modal';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card } from '@/components/ui/card';
-import { Plus, Search } from 'lucide-react';
-import { useAuth } from '@/hooks/use-auth';
-import { UpdateWithAuthor, DashboardStats } from '@shared/schema';
+import { useState, useCallback, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
+import Header from "@/components/layout/header";
+import Sidebar from "@/components/layout/sidebar";
+import UpdateCard from "@/components/updates/update-card";
+import CreateUpdateModal from "@/components/updates/create-update-modal";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Card } from "@/components/ui/card";
+import { Plus, Search } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
+
+import { UpdateWithAuthor, DashboardStats } from "@shared/schema";
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [timeFilter, setTimeFilter] = useState('week');
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [timeFilter, setTimeFilter] = useState("week");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  const { data: updates = [], isLoading: updatesLoading, refetch: refetchUpdates } = useQuery<UpdateWithAuthor[]>({
-    queryKey: ['/api/updates', selectedCategory],
+  // Global drag and drop state
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [draggedFiles, setDraggedFiles] = useState<File[]>([]);
+  const dragCounterRef = useRef(0);
+
+  const {
+    data: updates = [],
+    isLoading: updatesLoading,
+    refetch: refetchUpdates,
+  } = useQuery<UpdateWithAuthor[]>({
+    queryKey: ["/api/updates", selectedCategory],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (selectedCategory !== 'all') {
-        params.append('category', selectedCategory);
+      if (selectedCategory !== "all") {
+        params.append("category", selectedCategory);
       }
       const response = await fetch(`/api/updates?${params}`, {
-        credentials: 'include',
+        credentials: "include",
       });
-      if (!response.ok) throw new Error('Failed to fetch updates');
+      if (!response.ok) throw new Error("Failed to fetch updates");
       return response.json();
     },
   });
 
   const { data: stats } = useQuery<DashboardStats>({
-    queryKey: ['/api/stats/dashboard'],
+    queryKey: ["/api/stats/dashboard"],
   });
 
-  const filteredUpdates = updates.filter(update => {
+  // Global drag and drop handlers
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    dragCounterRef.current++;
+
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      setIsDragOver(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    dragCounterRef.current--;
+
+    if (dragCounterRef.current === 0) {
+      setIsDragOver(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      setIsDragOver(false);
+      dragCounterRef.current = 0;
+
+      const files = Array.from(e.dataTransfer.files);
+      if (files.length > 0 && user?.role === "cr") {
+        setDraggedFiles(files);
+        setIsCreateModalOpen(true);
+      }
+    },
+    [user?.role]
+  );
+
+  const filteredUpdates = updates.filter((update) => {
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       return (
@@ -50,12 +111,66 @@ export default function Dashboard() {
     return true;
   });
 
-  const isCR = user?.role === 'cr';
+  const isCR = user?.role === "cr";
 
   return (
-    <div className="min-h-screen bg-background">
+    <div
+      className="min-h-screen bg-background relative"
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      {/* Global Drag Overlay */}
+      {isDragOver && (
+        <div className="fixed inset-0 z-50 bg-primary/10 backdrop-blur-sm">
+          <div className="flex items-center justify-center h-full">
+            <div
+              className={`border-2 border-dashed rounded-lg p-12 text-center max-w-md mx-4 ${
+                user?.role === "cr"
+                  ? "bg-primary/20 border-primary text-primary"
+                  : "bg-muted/20 border-muted-foreground text-muted-foreground"
+              }`}
+            >
+              <div className="mb-4">
+                <svg
+                  className="w-16 h-16 mx-auto"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                  />
+                </svg>
+              </div>
+              {user?.role === "cr" ? (
+                <>
+                  <h3 className="text-xl font-semibold mb-2">
+                    Drop Files Here
+                  </h3>
+                  <p className="text-muted-foreground">
+                    Release to create a new update with your files
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-xl font-semibold mb-2">
+                    CR Access Required
+                  </h3>
+                  <p>Only Class Representatives can create updates</p>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <Header onCreateUpdate={() => setIsCreateModalOpen(true)} />
-      
+
       <div className="flex">
         <Sidebar
           selectedCategory={selectedCategory}
@@ -67,14 +182,20 @@ export default function Dashboard() {
           {/* Page Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8">
             <div>
-              <h2 className="text-2xl font-bold text-foreground" data-testid="page-title">
+              <h2
+                className="text-2xl font-bold text-foreground"
+                data-testid="page-title"
+              >
                 Class Updates Dashboard
               </h2>
-              <p className="text-muted-foreground mt-1" data-testid="page-subtitle">
+              <p
+                className="text-muted-foreground mt-1"
+                data-testid="page-subtitle"
+              >
                 {user?.class}
               </p>
             </div>
-            
+
             {isCR && (
               <div className="mt-4 sm:mt-0 flex space-x-3">
                 <Button
@@ -113,7 +234,10 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="flex space-x-2">
-                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <Select
+                  value={selectedCategory}
+                  onValueChange={setSelectedCategory}
+                >
                   <SelectTrigger className="w-40" data-testid="select-category">
                     <SelectValue placeholder="All Categories" />
                   </SelectTrigger>
@@ -148,13 +272,16 @@ export default function Dashboard() {
             ) : filteredUpdates.length === 0 ? (
               <Card className="p-12 text-center">
                 <div className="text-muted-foreground">
-                  <h3 className="text-lg font-medium mb-2" data-testid="no-updates-title">
+                  <h3
+                    className="text-lg font-medium mb-2"
+                    data-testid="no-updates-title"
+                  >
                     No updates found
                   </h3>
                   <p data-testid="no-updates-description">
                     {searchQuery
                       ? "Try adjusting your search terms or filters."
-                      : selectedCategory === 'all'
+                      : selectedCategory === "all"
                       ? "No updates have been posted yet."
                       : `No ${selectedCategory} updates found.`}
                   </p>
@@ -174,10 +301,7 @@ export default function Dashboard() {
           {/* Load More Button */}
           {filteredUpdates.length > 0 && (
             <div className="mt-8 text-center">
-              <Button
-                variant="secondary"
-                data-testid="button-load-more"
-              >
+              <Button variant="secondary" data-testid="button-load-more">
                 Load More Updates
               </Button>
             </div>
@@ -189,11 +313,16 @@ export default function Dashboard() {
       {isCR && (
         <CreateUpdateModal
           isOpen={isCreateModalOpen}
-          onClose={() => setIsCreateModalOpen(false)}
+          onClose={() => {
+            setIsCreateModalOpen(false);
+            setDraggedFiles([]);
+          }}
           onSuccess={() => {
             refetchUpdates();
             setIsCreateModalOpen(false);
+            setDraggedFiles([]);
           }}
+          preloadedFiles={draggedFiles}
         />
       )}
     </div>

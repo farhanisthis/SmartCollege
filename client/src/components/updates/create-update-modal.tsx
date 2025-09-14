@@ -1,75 +1,78 @@
-import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
-import { queryClient } from '@/lib/queryClient';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Edit, Upload, Camera, Sparkles, X } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import FileUpload from './file-upload';
+import { useState, useEffect } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Edit, Upload, Camera, Sparkles, X } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import FileUpload from "./file-upload";
 
 interface CreateUpdateModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  preloadedFiles?: File[];
 }
 
-export default function CreateUpdateModal({ isOpen, onClose, onSuccess }: CreateUpdateModalProps) {
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
-  const [originalContent, setOriginalContent] = useState('');
-  const [category, setCategory] = useState('');
-  const [priority, setPriority] = useState('normal');
+export default function CreateUpdateModal({
+  isOpen,
+  onClose,
+  onSuccess,
+  preloadedFiles = [],
+}: CreateUpdateModalProps) {
+  const [content, setContent] = useState("");
+  const [originalContent, setOriginalContent] = useState("");
+  const [priority, setPriority] = useState("normal");
   const [isUrgent, setIsUrgent] = useState(false);
-  const [dueDate, setDueDate] = useState('');
+  const [dueDate, setDueDate] = useState("");
   const [files, setFiles] = useState<File[]>([]);
-  const [activeTab, setActiveTab] = useState('text');
-  const [aiPreview, setAiPreview] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState("text");
   const [isProcessingAI, setIsProcessingAI] = useState(false);
-  
+
   const { toast } = useToast();
 
-  // AI categorization mutation
-  const categorizeMutation = useMutation({
-    mutationFn: async (content: string) => {
-      const response = await fetch('/api/ai/categorize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content }),
-        credentials: 'include',
-      });
-      if (!response.ok) throw new Error('Failed to categorize');
-      return response.json();
-    },
-    onSuccess: (data) => {
-      setAiPreview(data);
-      if (!category) setCategory(data.category);
-      if (data.isUrgent) setIsUrgent(true);
-      if (data.dueDate) setDueDate(data.dueDate);
-    },
-  });
+  // Handle preloaded files from drag and drop
+  useEffect(() => {
+    if (preloadedFiles.length > 0) {
+      setFiles(preloadedFiles);
+      setActiveTab("upload");
+    }
+  }, [preloadedFiles]);
 
   // Create update mutation
   const createMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      const response = await fetch('/api/updates', {
-        method: 'POST',
+      const response = await fetch("/api/updates", {
+        method: "POST",
         body: formData,
-        credentials: 'include',
+        credentials: "include",
       });
-      if (!response.ok) throw new Error('Failed to create update');
+      if (!response.ok) throw new Error("Failed to create update");
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/updates'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/stats/dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ["/api/updates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats/dashboard"] });
       onSuccess();
       resetForm();
       toast({
@@ -78,25 +81,41 @@ export default function CreateUpdateModal({ isOpen, onClose, onSuccess }: Create
       });
     },
     onError: (error: any) => {
+      console.error("Create update error:", error);
+
+      let errorMessage = "An unexpected error occurred";
+
+      if (error.message) {
+        errorMessage = error.message;
+      }
+
+      // Handle specific error cases
+      if (error.message?.includes("File too large")) {
+        errorMessage =
+          "One or more files are too large. Maximum file size is 50MB per file.";
+      } else if (error.message?.includes("Too many files")) {
+        errorMessage = "Too many files selected. Maximum 10 files allowed.";
+      } else if (error.message?.includes("File type")) {
+        errorMessage =
+          "Unsupported file type. Please use PDF, DOCX, PPT, images, or text files.";
+      }
+
       toast({
         title: "Failed to create update",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     },
   });
 
   const resetForm = () => {
-    setTitle('');
-    setContent('');
-    setOriginalContent('');
-    setCategory('');
-    setPriority('normal');
+    setContent("");
+    setOriginalContent("");
+    setPriority("normal");
     setIsUrgent(false);
-    setDueDate('');
+    setDueDate("");
     setFiles([]);
-    setAiPreview(null);
-    setActiveTab('text');
+    setActiveTab("text");
   };
 
   const handleClose = () => {
@@ -106,36 +125,26 @@ export default function CreateUpdateModal({ isOpen, onClose, onSuccess }: Create
 
   const handleContentChange = (value: string) => {
     setOriginalContent(value);
-    
-    // Trigger AI categorization if content is substantial
-    if (value.trim().length > 20) {
-      setIsProcessingAI(true);
-      setTimeout(() => {
-        categorizeMutation.mutate(value);
-        setIsProcessingAI(false);
-      }, 1000); // Debounce
-    } else {
-      setAiPreview(null);
-    }
+    // AI categorization is now only triggered on form submit
   };
 
   const handleImageAnalysis = async (file: File) => {
     try {
       const formData = new FormData();
-      formData.append('image', file);
-      
-      const response = await fetch('/api/ai/analyze-image', {
-        method: 'POST',
+      formData.append("image", file);
+
+      const response = await fetch("/api/ai/analyze-image", {
+        method: "POST",
         body: formData,
-        credentials: 'include',
+        credentials: "include",
       });
-      
-      if (!response.ok) throw new Error('Failed to analyze image');
-      
+
+      if (!response.ok) throw new Error("Failed to analyze image");
+
       const result = await response.json();
       setOriginalContent(result.extractedText);
       handleContentChange(result.extractedText);
-      
+
       toast({
         title: "Image analyzed",
         description: "Text extracted from image successfully.",
@@ -151,82 +160,76 @@ export default function CreateUpdateModal({ isOpen, onClose, onSuccess }: Create
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!title && !originalContent) {
+
+    if (!originalContent.trim() && files.length === 0) {
       toast({
         title: "Missing content",
-        description: "Please provide either a title and content, or original content for AI processing.",
+        description: "Please provide content or upload a file for the update.",
         variant: "destructive",
       });
       return;
     }
 
-    const formData = new FormData();
-    formData.append('title', title);
-    formData.append('content', content);
-    formData.append('originalContent', originalContent);
-    formData.append('category', category || 'general');
-    formData.append('priority', priority);
-    formData.append('isUrgent', isUrgent.toString());
-    if (dueDate) formData.append('dueDate', dueDate);
-    
-    files.forEach((file) => {
-      formData.append('files', file);
-    });
+    // Show AI processing indicator
+    setIsProcessingAI(true);
 
-    createMutation.mutate(formData);
+    try {
+      // Create the update - let the backend handle AI processing
+      const formData = new FormData();
+      formData.append("originalContent", originalContent);
+      formData.append("priority", priority);
+      formData.append("isUrgent", isUrgent.toString());
+      if (dueDate) formData.append("dueDate", dueDate);
+
+      files.forEach((file) => {
+        formData.append("files", file);
+      });
+
+      await createMutation.mutateAsync(formData);
+    } catch (error) {
+      console.error("Create update error:", error);
+    } finally {
+      setIsProcessingAI(false);
+    }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="create-update-modal">
+      <DialogContent
+        className="sm:max-w-2xl max-h-[90vh] overflow-y-auto"
+        data-testid="create-update-modal"
+      >
         <DialogHeader>
           <DialogTitle data-testid="modal-title">Create New Update</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Title */}
-          <div>
-            <Label htmlFor="title">Update Title</Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter a clear, descriptive title..."
-              data-testid="input-title"
-            />
-          </div>
-
-          {/* Category */}
-          <div>
-            <Label htmlFor="category">Category</Label>
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger data-testid="select-category">
-                <SelectValue placeholder="Select category..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="assignments">Assignment</SelectItem>
-                <SelectItem value="notes">Notes</SelectItem>
-                <SelectItem value="presentations">Presentation</SelectItem>
-                <SelectItem value="general">General Update</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
           {/* Content Input Methods */}
           <div>
             <Label>Content Input</Label>
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="text" className="flex items-center space-x-2" data-testid="tab-text">
+                <TabsTrigger
+                  value="text"
+                  className="flex items-center space-x-2"
+                  data-testid="tab-text"
+                >
                   <Edit className="h-4 w-4" />
                   <span>Text</span>
                 </TabsTrigger>
-                <TabsTrigger value="file" className="flex items-center space-x-2" data-testid="tab-file">
+                <TabsTrigger
+                  value="file"
+                  className="flex items-center space-x-2"
+                  data-testid="tab-file"
+                >
                   <Upload className="h-4 w-4" />
                   <span>File</span>
                 </TabsTrigger>
-                <TabsTrigger value="photo" className="flex items-center space-x-2" data-testid="tab-photo">
+                <TabsTrigger
+                  value="photo"
+                  className="flex items-center space-x-2"
+                  data-testid="tab-photo"
+                >
                   <Camera className="h-4 w-4" />
                   <span>Photo</span>
                 </TabsTrigger>
@@ -237,7 +240,7 @@ export default function CreateUpdateModal({ isOpen, onClose, onSuccess }: Create
                   <Textarea
                     value={originalContent}
                     onChange={(e) => handleContentChange(e.target.value)}
-                    placeholder="Paste teacher's message, assignment details, or any update content here. AI will automatically format and improve readability..."
+                    placeholder="Paste teacher's message, assignment details, or any update content here. You can also upload files instead of typing text. AI will automatically categorize, format, and generate a title when you click 'Create Update'..."
                     rows={6}
                     className="resize-none"
                     data-testid="textarea-content"
@@ -245,7 +248,12 @@ export default function CreateUpdateModal({ isOpen, onClose, onSuccess }: Create
                   {isProcessingAI && (
                     <div className="flex items-center text-xs text-muted-foreground">
                       <Sparkles className="h-3 w-3 mr-1 animate-pulse" />
-                      <span>AI is analyzing content...</span>
+                      <span>AI is processing content...</span>
+                    </div>
+                  )}
+                  {!originalContent.trim() && files.length > 0 && (
+                    <div className="flex items-center text-xs text-green-600">
+                      <span>✓ Files uploaded - ready to create update</span>
                     </div>
                   )}
                 </div>
@@ -274,35 +282,26 @@ export default function CreateUpdateModal({ isOpen, onClose, onSuccess }: Create
             </Tabs>
           </div>
 
-          {/* AI Processing Preview */}
-          {aiPreview && (
-            <Card className="bg-muted/50 border border-border p-4" data-testid="ai-preview">
+          {/* AI Processing Preview - Only shown during actual processing */}
+          {isProcessingAI && (
+            <Card
+              className="bg-muted/50 border border-border p-4"
+              data-testid="ai-preview"
+            >
               <div className="flex items-start space-x-3">
                 <div className="flex-shrink-0">
                   <div className="w-8 h-8 bg-primary/20 text-primary rounded-lg flex items-center justify-center">
-                    <Sparkles className="h-4 w-4" />
+                    <Sparkles className="h-4 w-4 animate-pulse" />
                   </div>
                 </div>
                 <div>
-                  <h4 className="text-sm font-medium text-foreground">AI Processing Preview</h4>
+                  <h4 className="text-sm font-medium text-foreground">
+                    AI Processing
+                  </h4>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Content will be automatically categorized and formatted
+                    Analyzing content, generating title, and determining
+                    category...
                   </p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <Badge variant="secondary" data-testid="predicted-category">
-                      Predicted: {aiPreview.category}
-                    </Badge>
-                    {aiPreview.isUrgent && (
-                      <Badge variant="destructive" data-testid="urgent-detected">
-                        Urgent Detected
-                      </Badge>
-                    )}
-                    {aiPreview.dueDate && (
-                      <Badge variant="outline" data-testid="due-date-detected">
-                        Due: {aiPreview.dueDate}
-                      </Badge>
-                    )}
-                  </div>
                 </div>
               </div>
             </Card>
@@ -318,14 +317,18 @@ export default function CreateUpdateModal({ isOpen, onClose, onSuccess }: Create
                   onCheckedChange={(checked) => setIsUrgent(checked === true)}
                   data-testid="checkbox-urgent"
                 />
-                <Label htmlFor="urgent" className="text-sm">Mark as urgent</Label>
+                <Label htmlFor="urgent" className="text-sm">
+                  Mark as urgent
+                </Label>
               </div>
             </div>
-            
+
             {/* Due Date */}
-            {(category === 'assignments' || isUrgent) && (
+            {isUrgent && (
               <div className="flex items-center space-x-2">
-                <Label htmlFor="dueDate" className="text-sm">Due Date:</Label>
+                <Label htmlFor="dueDate" className="text-sm">
+                  Due Date:
+                </Label>
                 <Input
                   id="dueDate"
                   type="date"
@@ -344,13 +347,18 @@ export default function CreateUpdateModal({ isOpen, onClose, onSuccess }: Create
               <Label>Attached Files</Label>
               <div className="space-y-2 mt-2" data-testid="file-list">
                 {files.map((file, index) => (
-                  <div key={index} className="flex items-center justify-between bg-muted rounded-lg px-3 py-2">
+                  <div
+                    key={index}
+                    className="flex items-center justify-between bg-muted rounded-lg px-3 py-2"
+                  >
                     <span className="text-sm">{file.name}</span>
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() => setFiles(files.filter((_, i) => i !== index))}
+                      onClick={() =>
+                        setFiles(files.filter((_, i) => i !== index))
+                      }
                       data-testid={`remove-file-${index}`}
                     >
                       <X className="h-3 w-3" />
@@ -379,7 +387,9 @@ export default function CreateUpdateModal({ isOpen, onClose, onSuccess }: Create
             data-testid="button-create"
           >
             <Sparkles className="h-4 w-4" />
-            <span>{createMutation.isPending ? 'Creating...' : 'Create with AI'}</span>
+            <span>
+              {createMutation.isPending ? "Creating..." : "Create with AI"}
+            </span>
           </Button>
         </DialogFooter>
       </DialogContent>
