@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useMutation, queryClient } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
+import { queryClient } from '@/lib/queryClient';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -260,7 +261,7 @@ export default function CreateUpdateModal({ isOpen, onClose, onSuccess }: Create
 
               <TabsContent value="photo" className="mt-4">
                 <FileUpload
-                  onFilesChange={(newFiles) => {
+                  onFilesChange={(newFiles: File[]) => {
                     setFiles(newFiles);
                     if (newFiles.length > 0) {
                       handleImageAnalysis(newFiles[0]);

@@ -180,10 +180,10 @@ export default function UpdateCard({ update, onRefresh }: UpdateCardProps) {
                   <Eye className="h-3 w-3" />
                   <span>{update.viewCount} views</span>
                 </span>
-                {update.downloadCount > 0 && (
+                {(update.downloadCount || 0) > 0 && (
                   <span className="flex items-center space-x-1" data-testid="download-count">
                     <Download className="h-3 w-3" />
-                    <span>{update.downloadCount} downloads</span>
+                    <span>{update.downloadCount || 0} downloads</span>
                   </span>
                 )}
               </div>

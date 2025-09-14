@@ -8,6 +8,8 @@ import path from "path";
 import fs from "fs";
 import session from "express-session";
 
+// Session types are defined in types/session.d.ts
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Session configuration
   app.use(session({
@@ -266,8 +268,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "File not found" });
       }
 
-      // Get file info from storage
-      const file = Array.from(await storage.getFilesByUpdateId('')).find(f => f.filename === filename);
+      // Get file info from storage by searching through all files
+      const allFiles = await storage.getAllFiles();
+      const file = allFiles.find(f => f.filename === filename);
       
       if (file) {
         // Increment download count

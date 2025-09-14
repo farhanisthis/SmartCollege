@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Update, type InsertUpdate, type File, type InsertFile, type UpdateWithAuthor, type DashboardStats, type UserView } from "@shared/schema";
+import { type User, type InsertUser, type Update, type InsertUpdate, type File, type InsertFile, type UpdateWithAuthor, type DashboardStats } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -19,6 +19,7 @@ export interface IStorage {
   // File methods
   createFile(file: InsertFile): Promise<File>;
   getFilesByUpdateId(updateId: string): Promise<File[]>;
+  getAllFiles(): Promise<File[]>;
   getFile(id: string): Promise<File | undefined>;
   deleteFile(id: string): Promise<boolean>;
   
@@ -85,7 +86,8 @@ export class MemStorage implements IStorage {
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = randomUUID();
     const user: User = { 
-      ...insertUser, 
+      ...insertUser,
+      role: insertUser.role || "student", // Ensure role has default value
       id,
       createdAt: new Date(),
     };
@@ -160,6 +162,7 @@ export class MemStorage implements IStorage {
     const now = new Date();
     const update: Update = {
       ...insertUpdate,
+      originalContent: insertUpdate.originalContent || null, // Ensure originalContent is properly typed
       id,
       viewCount: 0,
       downloadCount: 0,
@@ -216,6 +219,10 @@ export class MemStorage implements IStorage {
 
   async getFilesByUpdateId(updateId: string): Promise<File[]> {
     return Array.from(this.files.values()).filter(file => file.updateId === updateId);
+  }
+
+  async getAllFiles(): Promise<File[]> {
+    return Array.from(this.files.values());
   }
 
   async getFile(id: string): Promise<File | undefined> {
