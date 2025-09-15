@@ -3,7 +3,13 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import {
   ClipboardList,
   StickyNote,
@@ -64,6 +70,7 @@ export default function UpdateCard({ update, onRefresh }: UpdateCardProps) {
   const [previewFile, setPreviewFile] = useState<{
     file: any;
     url: string;
+    isBlob?: boolean;
   } | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -75,7 +82,7 @@ export default function UpdateCard({ update, onRefresh }: UpdateCardProps) {
 
   const handleDownload = async (fileId: string, filename: string) => {
     try {
-      const response = await fetch(`/api/files/${filename}`, {
+      const response = await fetch(`/api/files/${filename}?download=true`, {
         credentials: "include",
       });
 
@@ -176,19 +183,13 @@ export default function UpdateCard({ update, onRefresh }: UpdateCardProps) {
 
   const handlePreview = async (file: any) => {
     try {
-      const response = await fetch(`/api/files/${file.filename}`, {
-        credentials: "include",
-      });
-      
-      if (!response.ok) {
-        throw new Error("Failed to fetch file");
-      }
+      console.log("Attempting to preview file:", file.filename, file.mimeType);
 
-      // Create a blob URL for preview
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      
-      setPreviewFile({ file, url });
+      // Use direct static file serving
+      const previewUrl = `/uploads/${file.filename}`;
+      console.log("Using static file URL:", previewUrl);
+
+      setPreviewFile({ file, url: previewUrl, isBlob: false });
     } catch (error) {
       console.error("Preview error:", error);
       toast({
@@ -200,54 +201,119 @@ export default function UpdateCard({ update, onRefresh }: UpdateCardProps) {
   };
 
   const closePreview = () => {
-    if (previewFile?.url) {
-      URL.revokeObjectURL(previewFile.url);
-    }
     setPreviewFile(null);
   };
 
   const renderPreviewContent = () => {
-    if (!previewFile) return null;
+    if (!previewFile) {
+      console.log("No preview file available");
+      return null;
+    }
 
     const { file, url } = previewFile;
     const mimeType = file.mimeType;
 
-    if (mimeType.startsWith('image/')) {
+    console.log("Rendering preview content:", {
+      filename: file.originalName,
+      mimeType,
+      url,
+    });
+
+    if (mimeType.startsWith("image/")) {
       return (
-        <img 
-          src={url} 
-          alt={file.originalName}
-          className="max-w-full max-h-96 object-contain mx-auto"
-        />
+        <div className="text-center h-full flex flex-col justify-center">
+          <img
+            src={url}
+            alt={file.originalName}
+            className="max-w-full max-h-[calc(85vh-140px)] object-contain mx-auto rounded-lg shadow-lg"
+            onLoad={() => console.log("Image loaded successfully")}
+            onError={(e) => console.error("Image failed to load:", e)}
+          />
+          <p className="text-sm text-muted-foreground mt-4">
+            {file.originalName} • {mimeType}
+          </p>
+        </div>
       );
     }
 
-    if (mimeType === 'application/pdf') {
+    if (mimeType === "application/pdf") {
+      console.log("Rendering PDF with static URL:", url);
       return (
-        <iframe
-          src={url}
-          className="w-full h-96"
-          title={file.originalName}
-        />
-      );
-    }
-
-    if (mimeType === 'text/plain') {
-      return (
-        <div className="p-4 bg-muted rounded">
-          <p className="text-sm text-muted-foreground mb-2">Text file preview:</p>
+        <div className="h-full">
           <iframe
             src={url}
-            className="w-full h-64 border"
+            className="w-full h-[calc(85vh-140px)] border rounded-lg"
+            title={file.originalName}
+            onLoad={() => console.log("PDF iframe loaded successfully")}
+            onError={(e) => {
+              console.error("Iframe failed to load:", e);
+            }}
+          />
+          <div className="mt-2 text-center space-y-2">
+            <p className="text-sm text-muted-foreground">
+              {file.originalName} • PDF Document
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.open(url, "_blank")}
+              className="text-xs"
+            >
+              Open in New Tab
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    if (mimeType === "text/plain") {
+      return (
+        <div className="h-full">
+          <p className="text-sm text-muted-foreground mb-4">
+            Text file preview:
+          </p>
+          <iframe
+            src={url}
+            className="w-full h-[calc(85vh-180px)] border rounded-lg bg-white"
             title={file.originalName}
           />
+          <p className="text-sm text-muted-foreground mt-2">
+            {file.originalName} • Text Document
+          </p>
+        </div>
+      );
+    }
+
+    // For Office documents, show info and download option
+    if (
+      mimeType.includes("word") ||
+      mimeType.includes("powerpoint") ||
+      mimeType.includes("excel")
+    ) {
+      const docType = mimeType.includes("word")
+        ? "Word Document"
+        : mimeType.includes("powerpoint")
+        ? "PowerPoint Presentation"
+        : "Excel Spreadsheet";
+      return (
+        <div className="text-center p-8 h-full flex flex-col justify-center">
+          <FileText className="h-16 w-16 mx-auto mb-4 text-blue-500" />
+          <p className="text-lg font-medium mb-2">{file.originalName}</p>
+          <p className="text-muted-foreground mb-4">{docType}</p>
+          <p className="text-sm text-muted-foreground mb-4">
+            Preview not available for this file type. Download to view content.
+          </p>
+          <Button onClick={() => handleDownload(file.id, file.filename)}>
+            <Download className="h-4 w-4 mr-2" />
+            Download to view
+          </Button>
         </div>
       );
     }
 
     // For other file types, show download option
     return (
-      <div className="text-center p-8">
+      <div className="text-center p-8 h-full flex flex-col justify-center">
         <FileText className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
         <p className="text-lg font-medium mb-2">{file.originalName}</p>
         <p className="text-muted-foreground mb-4">
@@ -307,13 +373,14 @@ export default function UpdateCard({ update, onRefresh }: UpdateCardProps) {
               {update.title}
             </h3>
 
-            {/* Only show content for general updates */}
-            {update.category === "general" && update.content && (
+            {/* Show description for all updates if available, otherwise show content for general */}
+            {(update.description ||
+              (update.category === "general" && update.content)) && (
               <p
                 className="text-muted-foreground mb-4 line-clamp-3"
                 data-testid="update-content"
               >
-                {update.content}
+                {update.description || update.content}
               </p>
             )}
 
@@ -444,21 +511,16 @@ export default function UpdateCard({ update, onRefresh }: UpdateCardProps) {
 
       {/* File Preview Modal */}
       <Dialog open={!!previewFile} onOpenChange={() => closePreview()}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <span>{previewFile?.file.originalName}</span>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={closePreview}
-                className="h-6 w-6"
-              >
-                <X className="h-4 w-4" />
-              </Button>
+        <DialogContent className="max-w-5xl w-[90vw] h-[85vh] overflow-hidden p-0">
+          <DialogHeader className="p-6 pb-2 border-b">
+            <DialogTitle>
+              <span className="truncate">{previewFile?.file.originalName}</span>
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              File preview for {previewFile?.file.originalName}
+            </DialogDescription>
           </DialogHeader>
-          <div className="mt-4">
+          <div className="p-6 h-[calc(85vh-80px)] overflow-auto">
             {renderPreviewContent()}
           </div>
         </DialogContent>

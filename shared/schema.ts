@@ -1,10 +1,20 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, boolean, jsonb, integer } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  varchar,
+  timestamp,
+  boolean,
+  jsonb,
+  integer,
+} from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   role: text("role").notNull().default("student"), // "cr" or "student"
@@ -14,14 +24,19 @@ export const users = pgTable("users", {
 });
 
 export const updates = pgTable("updates", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
   title: text("title").notNull(),
   content: text("content").notNull(),
+  description: text("description"), // AI-generated description
   originalContent: text("original_content"), // Raw content before AI formatting
   category: text("category").notNull(), // "assignments", "notes", "presentations", "general"
   priority: text("priority").default("normal"), // "normal", "urgent"
   tags: text("tags").array().default([]), // Additional tags
-  authorId: varchar("author_id").notNull().references(() => users.id),
+  authorId: varchar("author_id")
+    .notNull()
+    .references(() => users.id),
   isUrgent: boolean("is_urgent").default(false),
   dueDate: timestamp("due_date"),
   viewCount: integer("view_count").default(0),
@@ -31,8 +46,12 @@ export const updates = pgTable("updates", {
 });
 
 export const files = pgTable("files", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  updateId: varchar("update_id").notNull().references(() => updates.id),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  updateId: varchar("update_id")
+    .notNull()
+    .references(() => updates.id),
   filename: text("filename").notNull(),
   originalName: text("original_name").notNull(),
   mimeType: text("mime_type").notNull(),
@@ -42,9 +61,15 @@ export const files = pgTable("files", {
 });
 
 export const userViews = pgTable("user_views", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id),
-  updateId: varchar("update_id").notNull().references(() => updates.id),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id),
+  updateId: varchar("update_id")
+    .notNull()
+    .references(() => updates.id),
   viewedAt: timestamp("viewed_at").defaultNow(),
 });
 
@@ -88,7 +113,7 @@ export type CreateUpdate = z.infer<typeof createUpdateSchema>;
 
 // Extended types for API responses
 export type UpdateWithAuthor = Update & {
-  author: Pick<User, 'id' | 'name' | 'role'>;
+  author: Pick<User, "id" | "name" | "role">;
   files: File[];
   hasViewed?: boolean;
 };

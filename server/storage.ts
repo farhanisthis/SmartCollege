@@ -9,6 +9,7 @@ import {
   type DashboardStats,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { MongoStorage } from "./storage/mongodb";
 
 export interface IStorage {
   // User methods
@@ -29,6 +30,7 @@ export interface IStorage {
     id: string,
     update: Partial<InsertUpdate>
   ): Promise<Update | undefined>;
+  updateDescription(id: string, description: string): Promise<boolean>;
   deleteUpdate(id: string): Promise<boolean>;
   incrementViewCount(id: string): Promise<void>;
   incrementDownloadCount(id: string): Promise<void>;
@@ -71,10 +73,10 @@ export class MemStorage implements IStorage {
     // Create sample CR user
     const crUser: User = {
       id: randomUUID(),
-      username: "sarah.cr",
-      password: "password123", // In production, this would be hashed
+      username: "farhanisthis",
+      password: "123456", // In production, this would be hashed
       role: "cr",
-      name: "Sarah Chen",
+      name: "Farhan Ali",
       class: "Computer Science - Semester 5",
       createdAt: new Date(),
     };
@@ -83,10 +85,10 @@ export class MemStorage implements IStorage {
     // Create sample student user
     const studentUser: User = {
       id: randomUUID(),
-      username: "john.student",
-      password: "password123",
+      username: "rohit",
+      password: "123123",
       role: "student",
-      name: "John Doe",
+      name: "Rohit",
       class: "Computer Science - Semester 5",
       createdAt: new Date(),
     };
@@ -194,6 +196,7 @@ export class MemStorage implements IStorage {
     const now = new Date();
     const update: Update = {
       ...insertUpdate,
+      description: insertUpdate.description || null,
       originalContent: insertUpdate.originalContent || null,
       priority: insertUpdate.priority || null,
       tags: insertUpdate.tags || null,
@@ -223,6 +226,19 @@ export class MemStorage implements IStorage {
     };
     this.updates.set(id, updated);
     return updated;
+  }
+
+  async updateDescription(id: string, description: string): Promise<boolean> {
+    const existing = this.updates.get(id);
+    if (!existing) return false;
+
+    const updated: Update = {
+      ...existing,
+      description,
+      updatedAt: new Date(),
+    };
+    this.updates.set(id, updated);
+    return true;
   }
 
   async deleteUpdate(id: string): Promise<boolean> {
@@ -312,4 +328,5 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// Use MongoDB storage for data persistence
+export const storage = new MongoStorage();

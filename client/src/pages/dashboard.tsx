@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Header from "@/components/layout/header";
 import Sidebar from "@/components/layout/sidebar";
+import MobileBottomNav from "@/components/layout/mobile-bottom-nav";
 import UpdateCard from "@/components/updates/update-card";
 import CreateUpdateModal from "@/components/updates/create-update-modal";
 import { Button } from "@/components/ui/button";
@@ -16,11 +17,13 @@ import {
 import { Card } from "@/components/ui/card";
 import { Plus, Search } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 import { UpdateWithAuthor, DashboardStats } from "@shared/schema";
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [timeFilter, setTimeFilter] = useState("week");
@@ -105,6 +108,8 @@ export default function Dashboard() {
       return (
         update.title.toLowerCase().includes(query) ||
         update.content.toLowerCase().includes(query) ||
+        (update.description &&
+          update.description.toLowerCase().includes(query)) ||
         update.author.name.toLowerCase().includes(query)
       );
     }
@@ -172,13 +177,19 @@ export default function Dashboard() {
       <Header onCreateUpdate={() => setIsCreateModalOpen(true)} />
 
       <div className="flex">
-        <Sidebar
-          selectedCategory={selectedCategory}
-          onCategoryChange={setSelectedCategory}
-          stats={stats}
-        />
+        {!isMobile && (
+          <Sidebar
+            selectedCategory={selectedCategory}
+            onCategoryChange={setSelectedCategory}
+            stats={stats}
+          />
+        )}
 
-        <main className="flex-1 p-6 lg:pl-8">
+        <main
+          className={`flex-1 p-6 ${!isMobile ? "lg:pl-8" : ""} ${
+            isMobile ? "pb-20" : ""
+          }`}
+        >
           {/* Page Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8">
             <div>
@@ -308,6 +319,16 @@ export default function Dashboard() {
           )}
         </main>
       </div>
+
+      {/* Mobile Bottom Navigation */}
+      {isMobile && (
+        <MobileBottomNav
+          selectedCategory={selectedCategory}
+          onCategoryChange={setSelectedCategory}
+          onCreateUpdate={() => setIsCreateModalOpen(true)}
+          stats={stats}
+        />
+      )}
 
       {/* Create Update Modal */}
       {isCR && (

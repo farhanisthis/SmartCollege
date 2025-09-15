@@ -9,7 +9,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useAuth } from "@/hooks/use-auth";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface HeaderProps {
   onCreateUpdate?: () => void;
@@ -17,6 +19,7 @@ interface HeaderProps {
 
 export default function Header({ onCreateUpdate }: HeaderProps) {
   const { user, logout } = useAuth();
+  const isMobile = useIsMobile();
 
   const handleLogout = async () => {
     await logout();
@@ -43,7 +46,7 @@ export default function Header({ onCreateUpdate }: HeaderProps) {
               </h1>
             </div>
 
-            {user && (
+            {user && !isMobile && (
               <div className="hidden sm:flex items-center space-x-2 bg-accent px-3 py-1 rounded-full">
                 <span
                   className="text-sm text-accent-foreground font-medium"
@@ -56,7 +59,10 @@ export default function Header({ onCreateUpdate }: HeaderProps) {
             )}
           </div>
 
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
+            {/* Theme Toggle - hidden on mobile to save space */}
+            {!isMobile && <ThemeToggle />}
+
             {/* Notifications */}
             <Button
               variant="ghost"
@@ -102,6 +108,17 @@ export default function Header({ onCreateUpdate }: HeaderProps) {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
+                  {isMobile && (
+                    <>
+                      <div className="px-2 py-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">Theme</span>
+                          <ThemeToggle />
+                        </div>
+                      </div>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
                   <DropdownMenuItem data-testid="menu-profile">
                     <span>Profile Settings</span>
                   </DropdownMenuItem>

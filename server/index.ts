@@ -1,11 +1,28 @@
 import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
+import path from "path";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Serve uploaded files statically
+app.use(
+  "/uploads",
+  express.static(path.join(process.cwd(), "uploads"), {
+    setHeaders: (res, path) => {
+      // Set proper headers for file serving
+      if (path.endsWith(".pdf")) {
+        res.setHeader("Content-Type", "application/pdf");
+      } else if (path.match(/\.(jpg|jpeg|png|gif)$/i)) {
+        res.setHeader("Content-Type", "image/" + path.split(".").pop());
+      }
+      res.setHeader("Content-Disposition", "inline");
+    },
+  })
+);
 
 app.use((req, res, next) => {
   const start = Date.now();

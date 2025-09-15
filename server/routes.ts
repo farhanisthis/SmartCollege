@@ -4,9 +4,18 @@ import { storage } from "./storage";
 import { upload, getFilePath } from "./services/fileUpload";
 import fs from "fs";
 import path from "path";
-import { categorizeContent, formatContent, analyzeImage } from "./services/ai";
+import {
+  categorizeContent,
+  formatContent,
+  analyzeImage,
+  processContentWithFiles,
+} from "./services/ai";
 import { aiManager } from "../services/aiManager";
 import { processInput } from "./services/inputPipeline";
+import {
+  textExtractionService,
+  TextExtractionService,
+} from "./services/textExtraction";
 import session from "express-session";
 import multer from "multer";
 import type { Request, Response, NextFunction } from "express";
@@ -367,6 +376,147 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   );
 
+  // New unified upload endpoint - handles text + multiple files
+  app.post(
+    "/api/updates/unified",
+    requireCR,
+    upload.array("files", 10),
+    handleUploadError,
+    async (req: Request, res: Response) => {
+      try {
+        console.log("[unified-upload] Received unified upload request");
+        const { contextText } = req.body;
+        const files = req.files as Express.Multer.File[];
+
+        // Validate that we have either context text or files
+        if (!contextText?.trim() && (!files || files.length === 0)) {
+          return res.status(400).json({
+            message: "Either context text or files must be provided",
+          });
+        }
+
+        // Extract text from all uploaded files
+        const extractedTexts = [];
+
+        if (files && files.length > 0) {
+          console.log(`[unified-upload] Processing ${files.length} files`);
+
+          for (const file of files) {
+            try {
+              if (
+                TextExtractionService.isSupportedFileType(file.originalname)
+              ) {
+                const extracted = await textExtractionService.extractText(
+                  file.path
+                );
+                extractedTexts.push({
+                  fileName: file.originalname,
+                  content: extracted.content,
+                  metadata: extracted.metadata,
+                });
+                console.log(
+                  `[unified-upload] Extracted text from ${file.originalname}`
+                );
+              } else {
+                // For unsupported file types, use filename as content
+                extractedTexts.push({
+                  fileName: file.originalname,
+                  content: `File: ${file.originalname}`,
+                  metadata: {},
+                });
+                console.log(
+                  `[unified-upload] Unsupported file type: ${file.originalname}`
+                );
+              }
+            } catch (error) {
+              console.error(
+                `[unified-upload] Error extracting text from ${file.originalname}:`,
+                error
+              );
+              // Continue processing other files
+              extractedTexts.push({
+                fileName: file.originalname,
+                content: `Failed to extract text from ${file.originalname}`,
+                metadata: {},
+              });
+            }
+          }
+        }
+
+        // Process combined content with AI
+        console.log("[unified-upload] Processing content with AI");
+        let processed;
+        try {
+          processed = await processContentWithFiles(
+            contextText || "",
+            extractedTexts
+          );
+        } catch (error) {
+          console.error("[unified-upload] AI processing error:", error);
+          return res.status(500).json({
+            message: "AI processing failed",
+            error: String(error),
+          });
+        }
+
+        // Create the update
+        const updateData = {
+          title: processed.title,
+          content: processed.content,
+          description: processed.description,
+          originalContent: contextText || "",
+          category: processed.category.category,
+          priority: processed.category.isUrgent ? "urgent" : "normal",
+          authorId: req.session.userId!,
+          isUrgent: processed.category.isUrgent,
+          dueDate: processed.category.dueDate
+            ? new Date(processed.category.dueDate)
+            : undefined,
+          tags: processed.category.tags || [],
+        };
+
+        const update = await storage.createUpdate(updateData);
+        console.log("[unified-upload] Update created in storage");
+
+        // Save files to storage
+        if (files && files.length > 0) {
+          console.log("[unified-upload] Saving files to storage");
+          for (const file of files) {
+            await storage.createFile({
+              updateId: update.id,
+              filename: `${Date.now()}-${file.originalname}`,
+              originalName: file.originalname,
+              mimeType: file.mimetype,
+              size: file.size,
+              path: file.path,
+            });
+          }
+          console.log("[unified-upload] Files saved");
+        }
+
+        const completeUpdate = await storage.getUpdate(update.id);
+        console.log("[unified-upload] Complete update ready");
+
+        res.status(201).json({
+          update: completeUpdate,
+          processing: {
+            extractedTexts: processed.extractedTexts?.map((et) => ({
+              fileName: et.fileName,
+              extractedLength: et.content.length,
+            })),
+            category: processed.category,
+          },
+        });
+      } catch (error) {
+        console.error("[unified-upload] Error:", error);
+        res.status(400).json({
+          message: "Failed to process unified upload",
+          error: String(error),
+        });
+      }
+    }
+  );
+
   // AI routes
   app.post("/api/ai/categorize", requireCR, async (req, res) => {
     try {
@@ -495,9 +645,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allFiles = await storage.getAllFiles();
       const file = allFiles.find((f) => f.filename === filename);
 
-      if (file) {
-        // Increment download count
+      const download = req.query.download === "true";
+
+      if (file && download) {
+        // Increment download count only for actual downloads
         await storage.incrementDownloadCount(file.updateId);
+      }
+
+      // Set appropriate headers for inline viewing vs download
+      if (download) {
+        res.setHeader(
+          "Content-Disposition",
+          `attachment; filename="${file?.originalName || filename}"`
+        );
+      } else {
+        res.setHeader(
+          "Content-Disposition",
+          `inline; filename="${file?.originalName || filename}"`
+        );
+
+        // Set proper Content-Type for preview
+        if (file?.mimeType) {
+          res.setHeader("Content-Type", file.mimeType);
+        }
+
+        // Add headers to allow iframe embedding
+        res.setHeader("X-Frame-Options", "SAMEORIGIN");
+        res.setHeader("Content-Security-Policy", "frame-ancestors 'self'");
       }
 
       res.sendFile(path.resolve(filePath));
@@ -506,6 +680,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to download file" });
     }
   });
+
+  // Dedicated preview endpoint
+  app.get("/api/preview/:filename", requireAuth, async (req, res) => {
+    try {
+      const { filename } = req.params;
+      const filePath = getFilePath(filename);
+
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ message: "File not found" });
+      }
+
+      // Get file info from storage
+      const allFiles = await storage.getAllFiles();
+      const file = allFiles.find((f) => f.filename === filename);
+
+      // Force inline display for preview with minimal headers
+      res.setHeader("Content-Disposition", "inline");
+
+      if (file?.mimeType) {
+        res.setHeader("Content-Type", file.mimeType);
+      }
+
+      // Send file
+      res.sendFile(path.resolve(filePath));
+    } catch (error) {
+      console.error("File preview error:", error);
+      res.status(500).json({ message: "Failed to preview file" });
+    }
+  });
+
+  // Admin endpoint to regenerate descriptions for existing updates
+  app.post(
+    "/api/admin/regenerate-descriptions",
+    requireAuth,
+    async (req, res) => {
+      try {
+        // Check if user has admin/cr privileges
+        const userRole = req.session.userRole;
+        if (userRole !== "cr") {
+          return res
+            .status(403)
+            .json({ message: "Access denied. CR privileges required." });
+        }
+
+        // Get all updates without pagination
+        const allUpdates = await storage.getUpdates({ limit: 1000 }); // Get up to 1000 updates
+
+        let processedCount = 0;
+        let errorCount = 0;
+        const errors: string[] = [];
+
+        for (const update of allUpdates) {
+          try {
+            // Skip if description already exists and is meaningful (more than just basic info)
+            if (
+              update.description &&
+              update.description.length > 50 &&
+              !update.description.includes("No schedule mentioned") &&
+              !update.description.includes("No deadline mentioned")
+            ) {
+              continue;
+            }
+
+            // Use the content field if available, otherwise use title
+            const contentToAnalyze = update.content || update.title;
+
+            if (!contentToAnalyze || contentToAnalyze.trim().length < 10) {
+              errors.push(
+                `Update ${update.id}: Insufficient content to analyze`
+              );
+              errorCount++;
+              continue;
+            }
+
+            // Use the AI service to generate new description
+            const categoryResult = {
+              category: update.category as
+                | "assignments"
+                | "notes"
+                | "presentations"
+                | "general",
+              confidence: 1.0,
+              isUrgent: false,
+              tags: [],
+            };
+            const result = await formatContent(
+              contentToAnalyze,
+              categoryResult
+            );
+
+            if (result && result.content && result.content.trim().length > 0) {
+              // Extract description from the formatted content
+              // The AI returns content that should be used as description
+              await storage.updateDescription(update.id, result.content);
+              processedCount++;
+            } else {
+              errors.push(
+                `Update ${update.id}: AI failed to generate description`
+              );
+              errorCount++;
+            }
+          } catch (error) {
+            errors.push(
+              `Update ${update.id}: ${
+                error instanceof Error ? error.message : "Unknown error"
+              }`
+            );
+            errorCount++;
+          }
+        }
+
+        res.json({
+          message: "Description regeneration completed",
+          totalUpdates: allUpdates.length,
+          processedCount,
+          errorCount,
+          errors: errors.slice(0, 10), // Limit to first 10 errors
+        });
+      } catch (error) {
+        console.error("Regenerate descriptions error:", error);
+        res.status(500).json({ message: "Failed to regenerate descriptions" });
+      }
+    }
+  );
 
   // Stats routes
   app.get("/api/stats/dashboard", requireAuth, async (req, res) => {
