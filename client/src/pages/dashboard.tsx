@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import Header from "@/components/layout/header";
 import Sidebar from "@/components/layout/sidebar";
 import MobileBottomNav from "@/components/layout/mobile-bottom-nav";
+import MobileCreateFab from "@/components/layout/mobile-create-fab";
 import UpdateCard from "@/components/updates/update-card";
 import CreateUpdateModal from "@/components/updates/create-update-modal";
 import { Button } from "@/components/ui/button";
@@ -325,10 +326,12 @@ export default function Dashboard() {
         <MobileBottomNav
           selectedCategory={selectedCategory}
           onCategoryChange={setSelectedCategory}
-          onCreateUpdate={() => setIsCreateModalOpen(true)}
           stats={stats}
         />
       )}
+
+      {/* Mobile Floating Action Button */}
+      <MobileCreateFab onCreateUpdate={() => setIsCreateModalOpen(true)} />
 
       {/* Create Update Modal */}
       {isCR && (

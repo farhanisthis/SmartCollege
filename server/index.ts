@@ -80,7 +80,7 @@ app.use((req, res, next) => {
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || "10000", 10);
   const host = "0.0.0.0"; // Bind to all interfaces for Render deployment
-  
+
   server.listen(port, host, () => {
     log(`serving on http://${host}:${port}`);
   });

@@ -6,15 +6,12 @@ import {
   StickyNote,
   Presentation,
   Megaphone,
-  Plus,
 } from "lucide-react";
 import { DashboardStats } from "@shared/schema";
-import { useAuth } from "@/hooks/use-auth";
 
 interface MobileBottomNavProps {
   selectedCategory: string;
   onCategoryChange: (category: string) => void;
-  onCreateUpdate?: () => void;
   stats?: DashboardStats;
 }
 
@@ -49,21 +46,12 @@ const categoryConfig = {
 export default function MobileBottomNav({
   selectedCategory,
   onCategoryChange,
-  onCreateUpdate,
   stats,
 }: MobileBottomNavProps) {
-  const { user } = useAuth();
-  const isCR = user?.role === "cr";
-
   const getCategoryCount = (category: string) => {
     if (!stats) return 0;
     return stats.counts[category as keyof typeof stats.counts] || 0;
   };
-
-  const categoryEntries = Object.entries(categoryConfig);
-  const midPoint = Math.ceil(categoryEntries.length / 2);
-  const firstHalf = categoryEntries.slice(0, midPoint);
-  const secondHalf = categoryEntries.slice(midPoint);
 
   const renderCategoryButton = ([category, config]: [string, any]) => {
     const Icon = config.icon;
@@ -101,23 +89,8 @@ export default function MobileBottomNav({
   return (
     <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border safe-area-padding-bottom">
       <div className="flex items-center justify-around px-2 py-2">
-        {/* First half of categories */}
-        {firstHalf.map(renderCategoryButton)}
-
-        {/* Create Button for CR users - centered */}
-        {isCR && (
-          <Button
-            size="sm"
-            className="flex flex-col items-center justify-center p-3 min-w-0 bg-primary text-primary-foreground rounded-full w-14 h-14 shadow-lg"
-            onClick={onCreateUpdate}
-            data-testid="mobile-create-update"
-          >
-            <Plus className="h-6 w-6" />
-          </Button>
-        )}
-
-        {/* Second half of categories */}
-        {secondHalf.map(renderCategoryButton)}
+        {/* All categories in a single row */}
+        {Object.entries(categoryConfig).map(renderCategoryButton)}
       </div>
     </div>
   );
