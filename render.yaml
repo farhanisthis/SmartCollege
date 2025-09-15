@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: smartcollege
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+    # Add your environment variables here:
+    # - key: MONGODB_URI
+    #   value: your-mongodb-connection-string
+    # - key: OPENAI_API_KEY
+    #   value: your-openai-api-key
+    # - key: GOOGLE_AI_API_KEY
+    #   value: your-google-ai-api-key
