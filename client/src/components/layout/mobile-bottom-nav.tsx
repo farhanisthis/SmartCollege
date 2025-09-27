@@ -88,9 +88,11 @@ export default function MobileBottomNav({
 
   return (
     <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border safe-area-padding-bottom">
-      <div className="flex items-center justify-around px-2 py-2">
-        {/* All categories in a single row */}
-        {Object.entries(categoryConfig).map(renderCategoryButton)}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-around py-2">
+          {/* All categories in a single row */}
+          {Object.entries(categoryConfig).map(renderCategoryButton)}
+        </div>
       </div>
     </div>
   );

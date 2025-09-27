@@ -1,4 +1,4 @@
-import { Bell, GraduationCap, ChevronDown } from "lucide-react";
+import { Bell, GraduationCap, ChevronDown, Wifi, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -10,8 +10,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useWebSocket } from "@/contexts/WebSocketContext";
+import NotificationBell from "@/components/notifications/notification-bell";
 
 interface HeaderProps {
   onCreateUpdate?: () => void;
@@ -20,6 +27,7 @@ interface HeaderProps {
 export default function Header({ onCreateUpdate }: HeaderProps) {
   const { user, logout } = useAuth();
   const isMobile = useIsMobile();
+  const { connected } = useWebSocket();
 
   const handleLogout = async () => {
     await logout();
@@ -60,25 +68,38 @@ export default function Header({ onCreateUpdate }: HeaderProps) {
           </div>
 
           <div className="flex items-center space-x-2">
+            {/* WebSocket Connection Status */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={`h-8 w-8 ${
+                    connected ? "text-green-500" : "text-red-500"
+                  }`}
+                  data-testid="websocket-status"
+                >
+                  {connected ? (
+                    <Wifi className="h-4 w-4" />
+                  ) : (
+                    <WifiOff className="h-4 w-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>
+                  {connected
+                    ? "Real-time updates connected"
+                    : "Real-time updates disconnected"}
+                </p>
+              </TooltipContent>
+            </Tooltip>
+
             {/* Theme Toggle - hidden on mobile to save space */}
             {!isMobile && <ThemeToggle />}
 
             {/* Notifications */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="relative"
-              data-testid="button-notifications"
-            >
-              <Bell className="h-5 w-5" />
-              <Badge
-                variant="destructive"
-                className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center text-xs"
-                data-testid="notification-count"
-              >
-                3
-              </Badge>
-            </Button>
+            <NotificationBell data-testid="notification-bell" />
 
             {/* User Menu */}
             {user && (

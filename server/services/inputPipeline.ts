@@ -14,6 +14,7 @@ export interface ProcessedAIResult {
   confidence: number;
   isUrgent: boolean;
   dueDate?: string;
+  deadlineDate?: string;
   tags: string[];
   title: string;
   formattedContent: string;
@@ -62,6 +63,7 @@ export async function processInput(
     confidence: categoryResult.confidence,
     isUrgent: categoryResult.isUrgent,
     dueDate: categoryResult.dueDate,
+    deadlineDate: categoryResult.deadlineDate,
     tags: categoryResult.tags,
     title: formatted.title,
     formattedContent: formatted.content,

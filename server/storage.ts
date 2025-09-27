@@ -82,6 +82,18 @@ export class MemStorage implements IStorage {
     };
     this.users.set(crUser.id, crUser);
 
+    // Create second CR user
+    const kashishUser: User = {
+      id: randomUUID(),
+      username: "kashish",
+      password: "123123", // In production, this would be hashed
+      role: "cr",
+      name: "Kashish",
+      class: "Computer Science - Semester 5",
+      createdAt: new Date(),
+    };
+    this.users.set(kashishUser.id, kashishUser);
+
     // Create sample student user
     const studentUser: User = {
       id: randomUUID(),
@@ -119,22 +131,17 @@ export class MemStorage implements IStorage {
 
   async getUpdates(filters?: {
     category?: string;
-    authorId?: string;
     limit?: number;
     offset?: number;
   }): Promise<UpdateWithAuthor[]> {
+    console.log("[getUpdates] Starting with filters:", filters);
+
     let updatesArray = Array.from(this.updates.values());
 
     // Apply filters
     if (filters?.category && filters.category !== "all") {
       updatesArray = updatesArray.filter(
         (update) => update.category === filters.category
-      );
-    }
-
-    if (filters?.authorId) {
-      updatesArray = updatesArray.filter(
-        (update) => update.authorId === filters.authorId
       );
     }
 
@@ -156,7 +163,7 @@ export class MemStorage implements IStorage {
       const files = await this.getFilesByUpdateId(update.id);
 
       if (author) {
-        enrichedUpdates.push({
+        const enrichedUpdate = {
           ...update,
           author: {
             id: author.id,
@@ -164,7 +171,14 @@ export class MemStorage implements IStorage {
             role: author.role,
           },
           files,
-        });
+        };
+
+        // Debug log to see if subject is present
+        console.log(
+          `[getUpdates] Update ${update.id} - subject: ${update.subject}, title: ${update.title}`
+        );
+
+        enrichedUpdates.push(enrichedUpdate);
       }
     }
 
@@ -202,6 +216,8 @@ export class MemStorage implements IStorage {
       tags: insertUpdate.tags || null,
       isUrgent: insertUpdate.isUrgent || null,
       dueDate: insertUpdate.dueDate || null,
+      deadlineDate: insertUpdate.deadlineDate || null,
+      subject: insertUpdate.subject ?? null,
       id,
       viewCount: 0,
       downloadCount: 0,

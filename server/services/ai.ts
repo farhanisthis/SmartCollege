@@ -81,19 +81,141 @@ export interface CategoryResult {
   confidence: number;
   isUrgent: boolean;
   dueDate?: string;
+  deadlineDate?: string; // New field for parsed deadline date
   tags: string[];
 }
 
 export interface FormattedContent {
   title: string;
+  subject?: string;
   content: string;
   category: CategoryResult;
+}
+
+// Helper function to calculate the next occurrence of a weekday
+function getNextWeekday(
+  targetDay: string,
+  fromDate: Date = new Date()
+): string {
+  const days = [
+    "sunday",
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+  ];
+  const targetIndex = days.indexOf(targetDay.toLowerCase());
+
+  if (targetIndex === -1) return "";
+
+  const currentDay = fromDate.getDay();
+  let daysToAdd = targetIndex - currentDay;
+
+  // If it's the same day or past, get next week's occurrence
+  if (daysToAdd <= 0) {
+    daysToAdd += 7;
+  }
+
+  const nextDate = new Date(fromDate);
+  nextDate.setDate(nextDate.getDate() + daysToAdd);
+
+  return nextDate.toISOString().split("T")[0];
+}
+
+// Manual deadline detection function
+function manuallyDetectDeadline(content: string, currentDate: Date) {
+  const result = {
+    deadlineDate: undefined as string | undefined,
+    dueDate: undefined as string | undefined,
+  };
+  const contentLower = content.toLowerCase();
+
+  // Check for day names with deadline keywords
+  const dayKeywords = [
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
+  ];
+  const deadlineKeywords = [
+    "submit",
+    "due",
+    "deadline",
+    "by",
+    "before",
+    "until",
+    "complete",
+  ];
+
+  // Check if content contains both deadline keywords and day names
+  const hasDeadlineKeyword = deadlineKeywords.some((keyword) =>
+    contentLower.includes(keyword)
+  );
+
+  if (hasDeadlineKeyword) {
+    for (const day of dayKeywords) {
+      if (contentLower.includes(day)) {
+        result.deadlineDate = getNextWeekday(day, currentDate);
+        break;
+      }
+    }
+  }
+
+  // Check for explicit dates (basic patterns)
+  const datePatterns = [
+    /(\d{1,2})\s*(st|nd|rd|th)?\s*(sep|september|oct|october|nov|november|dec|december)/i,
+    /(\d{1,2})\/(\d{1,2})\/(\d{4})/,
+    /(september|october|november|december)\s*(\d{1,2})/i,
+  ];
+
+  for (const pattern of datePatterns) {
+    const match = contentLower.match(pattern);
+    if (match && hasDeadlineKeyword) {
+      // Basic date parsing - this could be improved
+      const currentYear = currentDate.getFullYear();
+      if (match[0].includes("sep") || match[0].includes("september")) {
+        const day = match[1] || match[2];
+        result.dueDate = `${currentYear}-09-${day.padStart(2, "0")}`;
+      }
+      // Add more date parsing logic here as needed
+      break;
+    }
+  }
+
+  return result;
 }
 
 export async function categorizeContent(
   content: string
 ): Promise<CategoryResult> {
-  const prompt = `You are an AI assistant that categorizes college academic content based on CONTENT, not file type. Analyze the given content carefully and categorize it:
+  const currentDate = new Date();
+  const currentDateStr = currentDate.toISOString().split("T")[0]; // YYYY-MM-DD format
+  const currentDay = currentDate.toLocaleDateString("en-US", {
+    weekday: "long",
+  });
+  const currentYear = currentDate.getFullYear();
+
+  // Calculate example dates for common day references
+  const nextMonday = getNextWeekday("monday", currentDate);
+  const nextTuesday = getNextWeekday("tuesday", currentDate);
+  const nextWednesday = getNextWeekday("wednesday", currentDate);
+  const nextThursday = getNextWeekday("thursday", currentDate);
+  const nextFriday = getNextWeekday("friday", currentDate);
+  const nextSaturday = getNextWeekday("saturday", currentDate);
+  const nextSunday = getNextWeekday("sunday", currentDate);
+  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000)
+    .toISOString()
+    .split("T")[0];
+
+  const prompt = `You are an AI assistant that categorizes college academic content and detects deadlines. 
+  
+Current date: ${currentDateStr} (${currentDay}) 
+Current year: ${currentYear}
 
 CATEGORIES:
 - assignments: homework, projects, tasks to be completed by students, assignment submissions
@@ -101,26 +223,71 @@ CATEGORIES:
 - presentations: presentation schedules, seminar announcements, viva notifications, presentation guidelines (includes words like "presentation", "seminar", "viva", "talk")
 - general: announcements, schedule changes, general information
 
-IMPORTANT RULES:
-1. Categorize based on CONTENT meaning, not file extension
-2. For presentations: Include both actual presentation files AND scheduling/announcement content about presentations
-3. Look for keywords: "presentation", "seminar", "viva", "talk", "present", "demo" for presentations category
-4. Detect urgency from words like "urgent", "immediate", "deadline", "due", "submit by"
-5. Extract specific dates in YYYY-MM-DD format when mentioned
+DEADLINE DETECTION AND CALCULATION:
+1. Look for deadline keywords and variations: 
+   - "due", "submit", "submit by", "submit it", "submit it by", "submit it before"
+   - "deadline", "by", "before", "until", "complete", "complete it", "complete by"
+   - "turn in", "hand in", "finish", "finish by", "done by"
 
-Analyze this content and respond with JSON in this exact format:
+2. Look for day references (case-insensitive) and calculate actual dates:
+   - "monday", "due monday", "this monday", "coming monday", "next monday" → ${nextMonday}
+   - "tuesday", "by tuesday", "this tuesday", "coming tuesday", "next tuesday" → ${nextTuesday}
+   - "wednesday", "this wednesday", "coming wednesday", "next wednesday" → ${nextWednesday}
+   - "thursday", "this thursday", "coming thursday", "next thursday" → ${nextThursday}
+   - "friday", "this friday", "coming friday", "next friday" → ${nextFriday}
+   - "saturday", "this saturday", "coming saturday", "next saturday" → ${nextSaturday}
+   - "sunday", "this sunday", "coming sunday", "next sunday" → ${nextSunday}
+   - "tomorrow" → ${tomorrow}
+
+3. CRITICAL: If you find ANY deadline keyword near ANY day reference, set deadlineDate
+4. For explicit dates (like "21st Sep", "September 21"), use dueDate field
+5. Examples that MUST be detected:
+   - "submit it before coming wednesday" → deadlineDate: "${nextWednesday}"
+   - "submit before coming wednesday" → deadlineDate: "${nextWednesday}"
+   - "due this friday" → deadlineDate: "${nextFriday}"
+   - "submit by 21 sep" → dueDate: "${currentYear}-09-21"
+   - "complete it by next monday" → deadlineDate: "${nextMonday}"
+
+DEADLINE FIELDS (provide when deadlines are detected):
+- dueDate: Extract explicit dates (e.g., "25th September" → "${currentYear}-09-25")
+- deadlineDate: Calculate relative dates using day names above
+
+IMPORTANT DETECTION RULES:
+- Be VERY aggressive in detecting deadlines - if there's ANY hint of a deadline, detect it
+- Case-insensitive matching for all keywords and day names
+- Partial phrase matching (e.g., "submit it before" should match "submit before")
+- Even vague references like "get this done by friday" should trigger detection
+
+CRITICAL: You MUST return deadlineDate field when detecting relative dates like "wednesday", "friday", etc.
+CRITICAL: You MUST return dueDate field when detecting explicit dates like "21 Sep", "September 25", etc.
+
+RESPONSE FORMAT: Respond with JSON only:
 {
   "category": "assignments|notes|presentations|general",
   "confidence": 0.95,
   "isUrgent": true/false,
   "dueDate": "YYYY-MM-DD" or null,
+  "deadlineDate": "YYYY-MM-DD" or null,
+  "tags": ["tag1", "tag2"]
+}
+
+MANDATORY EXAMPLES:
+- Input: "submit this assignment on wednesday" → Output: {"category": "assignments", "confidence": 0.95, "isUrgent": true, "dueDate": null, "deadlineDate": "${nextWednesday}", "tags": ["assignment"]}
+- Input: "homework due this friday" → Output: {"category": "assignments", "confidence": 0.95, "isUrgent": true, "dueDate": null, "deadlineDate": "${nextFriday}", "tags": ["homework"]}
+- Input: "submit by 25 Sep" → Output: {"category": "assignments", "confidence": 0.95, "isUrgent": true, "dueDate": "${currentYear}-09-25", "deadlineDate": null, "tags": ["deadline"]}
+{
+  "category": "assignments|notes|presentations|general",
+  "confidence": 0.95,
+  "isUrgent": true/false,
+  "dueDate": "YYYY-MM-DD" or null,
+  "deadlineDate": "YYYY-MM-DD" or null,
   "tags": ["tag1", "tag2"]
 }
 
 Content to analyze:
 ${content}`;
 
-  const cacheKey = hashKey("categorize", content);
+  const cacheKey = hashKey("categorize", content, currentDateStr);
 
   // Check cache first
   if (aiCache.has(cacheKey)) {
@@ -134,6 +301,7 @@ ${content}`;
     if (result.success && result.data) {
       let text = result.data;
       text = text.replace(/^```json\s*|^```\s*|```$/gim, "").trim();
+
       const parsedResult = JSON.parse(text);
 
       const categoryResult = {
@@ -141,8 +309,24 @@ ${content}`;
         confidence: Math.max(0, Math.min(1, parsedResult.confidence || 0.8)),
         isUrgent: parsedResult.isUrgent || false,
         dueDate: parsedResult.dueDate || undefined,
+        deadlineDate: parsedResult.deadlineDate || undefined,
         tags: Array.isArray(parsedResult.tags) ? parsedResult.tags : [],
       };
+
+      // Post-processing: If AI failed to detect deadline dates, manually detect them
+      if (!categoryResult.deadlineDate && !categoryResult.dueDate) {
+        console.log("[AI] Manual deadline detection triggered for:", content);
+        const manualDeadline = manuallyDetectDeadline(content, currentDate);
+        console.log("[AI] Manual detection result:", manualDeadline);
+        if (manualDeadline.deadlineDate) {
+          categoryResult.deadlineDate = manualDeadline.deadlineDate;
+          console.log("[AI] Added deadlineDate:", manualDeadline.deadlineDate);
+        }
+        if (manualDeadline.dueDate) {
+          categoryResult.dueDate = manualDeadline.dueDate;
+          console.log("[AI] Added dueDate:", manualDeadline.dueDate);
+        }
+      }
 
       // Cache the result
       aiCache.set(cacheKey, categoryResult);
@@ -164,6 +348,7 @@ ${content}`;
         confidence: Math.max(0, Math.min(1, parsedResult.confidence || 0.8)),
         isUrgent: parsedResult.isUrgent || false,
         dueDate: parsedResult.dueDate || undefined,
+        deadlineDate: parsedResult.deadlineDate || undefined,
         tags: Array.isArray(parsedResult.tags) ? parsedResult.tags : [],
       };
     }
@@ -185,6 +370,7 @@ ${content}`;
       category: "general",
       confidence: 0.5,
       isUrgent: false,
+      deadlineDate: undefined,
       tags: [],
     };
   }
@@ -196,69 +382,216 @@ export async function formatContent(
 ): Promise<FormattedContent> {
   let prompt: string;
 
-  if (
-    detectedCategory.category === "assignments" ||
-    detectedCategory.category === "notes"
-  ) {
-    // For assignments and notes: Extract title and comprehensive details
-    prompt = `You are a data extractor for a class updates system. 
-Your task is to extract ONLY the essential details from the given content. 
+  if (detectedCategory.category === "assignments") {
+    // For assignments: Extract title, subject and comprehensive details with bullet points
+    prompt = `You are a data extractor for a class updates system specializing in assignment formatting.
+
+COMMON ACADEMIC SUBJECTS TO RECOGNIZE (including abbreviations):
+- Data Structures, Algorithm, DSA
+- Database Management, DBMS, Database
+- Operating System, OS
+- Computer Networks, Networking
+- Software Engineering, SE
+- Web Development, Web Programming
+- Machine Learning, ML, AI
+- Computer Graphics, CG (ALWAYS expand "CG" to "Computer Graphics")
+- Cloud Computing, CC
+- Principles of Management, POM
+- System Programming
+- Object Oriented Programming, OOP
+- Python Programming, Python
+- Java Programming, Java
+- C Programming, C Language
+- Mathematics, Maths, Discrete Math
+- Statistics, Probability
+- Physics, Chemistry, Biology
+- Management, Business Studies
+- Economics, Accounts
+
+FORMATTING RULES for description:
+- Use bullet points (•) for lists of students assigned
+- Use bullet points for requirements and deliverables
+- Use bullet points for submission guidelines
+- Use bullet points for grading criteria
+- Keep deadlines and general info as paragraphs
+- Format student names: "• Student Name 1\n• Student Name 2"
+- Format requirements: "• Requirement 1\n• Requirement 2"
 
 Rules:
-1. Extract the **title** → keep it short, clear, and based on the main task (e.g., "Minor Project", "DBMS Assignment").
-2. Extract the **description** → Include key details like:
-   - For assignments: deadline, submission format, requirements, instructions, marks
-   - For notes: topics covered, chapter/lecture details, key concepts, important points
-   - Any dates, requirements, or important information mentioned
-3. If no specific details found, provide a brief summary of what the content is about.
+1. Extract the **title** → keep it short, clear (e.g., "Data Structures Assignment", "DBMS Project").
+2. Extract the **subject** → identify from common subjects above.
+3. Extract the **description** → Format with bullet points for lists:
+   - Students assigned (if mentioned)
+   - Requirements and deliverables
+   - Submission details
+   - Grading criteria
 4. Output strictly in JSON format:
 {
   "title": "string",
+  "subject": "string", 
   "description": "string"
+}
+
+Example:
+Input: "Assignment for web development. Students: john, mary, david. Requirements: html validation, css responsiveness, javascript interactivity"
+Output: {
+  "title": "Web Development Assignment",
+  "subject": "Web Development",
+  "description": "Students assigned:\n• John\n• Mary\n• David\n\nRequirements:\n• HTML validation\n• CSS responsiveness\n• JavaScript interactivity"
+}
+
+Content to analyze:
+${rawContent}`;
+  } else if (detectedCategory.category === "notes") {
+    // For notes: Extract title, subject and comprehensive details with bullet points
+    prompt = `You are a data extractor for a class updates system specializing in notes formatting.
+
+COMMON ACADEMIC SUBJECTS TO RECOGNIZE (including abbreviations):
+- Data Structures, Algorithm, DSA
+- Database Management, DBMS, Database
+- Operating System, OS
+- Computer Networks, Networking
+- Software Engineering, SE
+- Web Development, Web Programming
+- Machine Learning, ML, AI
+- Computer Graphics, CG (ALWAYS expand "CG" to "Computer Graphics")
+- Cloud Computing, CC
+- Principles of Management, POM
+- System Programming
+- Object Oriented Programming, OOP
+- Python Programming, Python
+- Java Programming, Java
+- C Programming, C Language
+- Mathematics, Maths, Discrete Math
+- Statistics, Probability
+- Physics, Chemistry, Biology
+- Management, Business Studies
+- Economics, Accounts
+
+FORMATTING RULES for description:
+- Use bullet points (•) for key topics covered
+- Use bullet points for important concepts or definitions
+- Use bullet points for formulas or theorems
+- Use bullet points for examples or case studies
+- Keep explanatory text as paragraphs
+- Format topics: "• Topic 1: Brief explanation\n• Topic 2: Brief explanation"
+
+Rules:
+1. Extract the **title** → keep it short, clear (e.g., "Database Normalization Notes", "Algorithm Analysis").
+2. Extract the **subject** → identify from common subjects above.
+3. Extract the **description** → Format with bullet points for lists:
+   - Topics covered
+   - Key concepts
+   - Important formulas/theorems
+4. Output strictly in JSON format:
+{
+  "title": "string",
+  "subject": "string",
+  "description": "string"
+}
+
+Example:
+Input: "Database normalization notes covering 1NF, 2NF, 3NF, functional dependencies"
+Output: {
+  "title": "Database Normalization Notes", 
+  "subject": "Database Management",
+  "description": "Topics covered:\n• 1NF (First Normal Form)\n• 2NF (Second Normal Form)\n• 3NF (Third Normal Form)\n• Functional Dependencies"
 }
 
 Content to analyze:
 ${rawContent}`;
   } else if (detectedCategory.category === "presentations") {
-    // For presentations: Extract title and comprehensive schedule/details
-    prompt = `You are a data extractor for a class updates system. 
-Your task is to extract ONLY the essential details from presentation-related content.
+    // For presentations: Extract title, subject and comprehensive schedule/details with bullet points
+    prompt = `You are a data extractor for a class updates system specializing in presentation formatting.
+
+COMMON ACADEMIC SUBJECTS TO RECOGNIZE (including abbreviations):
+- Data Structures, Algorithm, DSA
+- Database Management, DBMS, Database
+- Operating System, OS
+- Computer Networks, Networking
+- Software Engineering, SE
+- Web Development, Web Programming
+- Machine Learning, ML, AI
+- Computer Graphics, CG (ALWAYS expand "CG" to "Computer Graphics")
+- System Programming
+- Object Oriented Programming, OOP
+- Python Programming, Python
+- Java Programming, Java
+- C Programming, C Language
+- Mathematics, Maths, Discrete Math
+- Statistics, Probability
+- Physics, Chemistry, Biology
+- Management, Business Studies
+- Economics, Accounts
+
+FORMATTING RULES for description:
+- Use bullet points (•) for list of presenters/speakers
+- Use bullet points for topics to be covered
+- Use bullet points for presentation requirements or guidelines
+- Use bullet points for agenda items
+- Keep venue, time, and general info as paragraphs
+- Format presenters: "• Presenter Name 1\n• Presenter Name 2"
+- Format topics: "• Topic A: Description\n• Topic B: Description"
 
 Rules:
-1. Extract the **title** → keep it short, clear, and based on the presentation topic (e.g., "CG Presentation", "Seminar on AI").
-2. Extract the **description** → Include key details like:
-   - Date and time of presentation/seminar/viva
-   - Venue/location if mentioned
-   - Topic or subject details
-   - Presenter information or roll numbers
-   - Duration, format, or special instructions
-3. If no specific details found, provide a brief summary of what the content is about.
+1. Extract the **title** → keep it short, clear (e.g., "Machine Learning Presentation", "Database Seminar").
+2. Extract the **subject** → identify from common subjects above.
+3. Extract the **description** → Format with bullet points for lists:
+   - Presenters/speakers
+   - Topics to be covered
+   - Requirements or guidelines
+   - Keep venue, time as paragraphs
 4. Output strictly in JSON format:
 {
   "title": "string",
+  "subject": "string",
   "description": "string"
+}
+
+Example:
+Input: "ML presentation by john and sarah on supervised learning algorithms, venue auditorium A, time 3pm"
+Output: {
+  "title": "Machine Learning Presentation",
+  "subject": "Machine Learning", 
+  "description": "Presenters:\n• John\n• Sarah\n\nTopics:\n• Supervised Learning Algorithms\n\nVenue: Auditorium A\nTime: 3:00 PM"
 }
 
 Content to analyze:
 ${rawContent}`;
   } else {
-    // For general updates: Extract title and important details/action items
-    prompt = `You are a data extractor for a class updates system. 
-Your task is to extract ONLY the essential details from general update content.
+    // For general updates: Extract title and important details/action items with bullet points
+    prompt = `You are a data extractor for a class updates system specializing in general announcements formatting.
+
+FORMATTING RULES for description:
+- Use bullet points (•) for lists of affected students, classes, or groups
+- Use bullet points for multiple important points or announcements
+- Use bullet points for rules or guidelines
+- Use bullet points for event details (when multiple items)
+- Keep single announcements as paragraphs
+- Format affected groups: "• Group 1\n• Group 2\n• Group 3"
+- Format rules: "• Rule 1\n• Rule 2\n• Rule 3"
 
 Rules:
-1. Extract the **title** → keep it short, clear, and based on the main topic (e.g., "Library Closure", "Fee Payment Reminder").
-2. Extract the **description** → Include key details like:
-   - Important dates, deadlines, or time-sensitive information
-   - Action items or things students need to do
-   - Contact information, phone numbers, or email addresses
-   - Policy changes, announcements, or new procedures
-   - Event details, locations, or schedule changes
-3. If the content contains multiple points, summarize the most important ones.
+1. Extract the **title** → keep it short, clear (e.g., "Library Closure", "Attendance Notice").
+2. For **subject** → use "General" as this is a general announcement.
+3. Extract the **description** → Format with bullet points for lists:
+   - Lists of affected students/groups
+   - Multiple important points
+   - Rules or guidelines
+   - Keep single announcements as paragraphs
 4. Output strictly in JSON format:
 {
   "title": "string",
+  "subject": "General",
   "description": "string"
+}
+
+Example:
+Input: "Important notice for students: john, mary, david regarding attendance. Must maintain 75% attendance to avoid debarment"
+Output: {
+  "title": "Attendance Notice",
+  "subject": "General",
+  "description": "Important notice for students:\n• John\n• Mary\n• David\n\nMust maintain 75% attendance to avoid debarment from exams."
 }
 
 Content to analyze:
@@ -338,6 +671,7 @@ ${rawContent}`;
 
             const formatResult = {
               title: parsedResult.title || extractTitleFromContent(rawContent),
+              subject: parsedResult.subject || null,
               content: parsedResult.description || "", // All prompts now use description field
               category: detectedCategory,
             };
@@ -433,6 +767,7 @@ ${rawContent}`;
 
     return {
       title: extractTitleFromContent(rawContent),
+      subject: undefined, // No subject extracted in fallback
       content: fallbackDescription,
       category: detectedCategory,
     };
@@ -509,6 +844,7 @@ export { analyzeImageContent as analyzeImage };
  */
 export interface ProcessedContent {
   title: string;
+  subject?: string;
   content: string;
   description: string;
   category: CategoryResult;
@@ -556,6 +892,7 @@ export async function processContentWithFiles(
 
   const result = {
     title: formatted.title,
+    subject: formatted.subject,
     content: combinedContent, // Keep original content
     description: formatted.content, // AI-generated description
     category,

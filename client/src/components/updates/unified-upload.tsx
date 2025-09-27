@@ -28,6 +28,7 @@ export function UnifiedUpload({
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const maxFiles = 5;
   const supportedFileTypes = [
     ".pdf",
     ".doc",
@@ -38,44 +39,30 @@ export function UnifiedUpload({
     ".jpeg",
     ".png",
     ".bmp",
-    ".tiff",
-    ".gif",
     ".txt",
   ];
 
-  const maxFileSize = 50 * 1024 * 1024; // 50MB
-  const maxFiles = 10;
-
-  const generateFileId = () => Math.random().toString(36).substr(2, 9);
-
   const validateFile = (file: File): string | null => {
-    const ext = "." + file.name.split(".").pop()?.toLowerCase();
-
-    if (!supportedFileTypes.includes(ext)) {
-      return `Unsupported file type: ${ext}. Supported types: ${supportedFileTypes.join(
-        ", "
-      )}`;
+    const maxSize = 50 * 1024 * 1024; // 50MB
+    if (file.size > maxSize) {
+      return `${file.name}: File size exceeds 50MB.`;
     }
-
-    if (file.size > maxFileSize) {
-      return `File too large: ${file.name}. Maximum size is 50MB.`;
-    }
-
     return null;
+  };
+
+  const generateFileId = (): string => {
+    return Math.random().toString(36).substr(2, 9);
   };
 
   const addFiles = useCallback(
     (files: FileList | File[]) => {
       const fileArray = Array.from(files);
-
       if (uploadedFiles.length + fileArray.length > maxFiles) {
         alert(`Too many files. Maximum ${maxFiles} files allowed.`);
         return;
       }
-
       const validFiles: UploadedFile[] = [];
       const errors: string[] = [];
-
       fileArray.forEach((file) => {
         const error = validateFile(file);
         if (error) {
@@ -85,8 +72,6 @@ export function UnifiedUpload({
             file,
             id: generateFileId(),
           };
-
-          // Generate preview for images
           if (file.type.startsWith("image/")) {
             const reader = new FileReader();
             reader.onload = (e) => {
@@ -100,15 +85,12 @@ export function UnifiedUpload({
             };
             reader.readAsDataURL(file);
           }
-
           validFiles.push(uploadedFile);
         }
       });
-
       if (errors.length > 0) {
         alert(`Some files were rejected:\n${errors.join("\n")}`);
       }
-
       if (validFiles.length > 0) {
         setUploadedFiles((prev) => [...prev, ...validFiles]);
       }
@@ -136,7 +118,6 @@ export function UnifiedUpload({
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(false);
-
     const files = e.dataTransfer.files;
     if (files.length > 0) {
       addFiles(files);
@@ -148,34 +129,29 @@ export function UnifiedUpload({
     if (files) {
       addFiles(files);
     }
-    // Reset input value to allow selecting the same file again
     e.target.value = "";
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!contextText.trim() && uploadedFiles.length === 0) {
       alert("Please provide either context text or upload files.");
       return;
     }
-
     try {
       await onSubmit({
         contextText: contextText.trim(),
         files: uploadedFiles.map((uf) => uf.file),
       });
-
-      // Clear form on success
       setContextText("");
       setUploadedFiles([]);
     } catch (error) {
       console.error("Upload failed:", error);
-      // Don't clear form on error so user can retry
     }
   };
 
   const getFileIcon = (fileName: string) => {
     const ext = fileName.split(".").pop()?.toLowerCase();
-
     if (["jpg", "jpeg", "png", "gif", "bmp", "tiff"].includes(ext || "")) {
       return <Image className="h-4 w-4" />;
     } else if (["pdf", "doc", "docx", "txt"].includes(ext || "")) {
@@ -196,7 +172,7 @@ export function UnifiedUpload({
   return (
     <Card className="w-full">
       <CardContent className="p-6">
-        <div className="space-y-4">
+        <form className="space-y-4" onSubmit={handleSubmit} autoComplete="off">
           {/* Context Text Area */}
           <div className="space-y-2">
             <Label htmlFor="contextText">Context Text (Optional)</Label>
@@ -209,10 +185,10 @@ export function UnifiedUpload({
               className="min-h-[100px] resize-none"
             />
             <p className="text-sm text-muted-foreground">
-              Provide context to help the AI better categorize your content
+              Provide context to help the AI better categorize your content and
+              automatically extract subject
             </p>
           </div>
-
           {/* File Upload Area */}
           <div className="space-y-2">
             <Label>Files (Optional)</Label>
@@ -242,7 +218,6 @@ export function UnifiedUpload({
                 {maxFiles} files
               </p>
             </div>
-
             <input
               ref={fileInputRef}
               type="file"
@@ -253,7 +228,6 @@ export function UnifiedUpload({
               disabled={disabled || isLoading}
             />
           </div>
-
           {/* Uploaded Files List */}
           {uploadedFiles.length > 0 && (
             <div className="space-y-2">
@@ -301,10 +275,9 @@ export function UnifiedUpload({
               </div>
             </div>
           )}
-
           {/* Submit Button */}
           <Button
-            onClick={handleSubmit}
+            type="submit"
             disabled={
               disabled ||
               isLoading ||
@@ -314,7 +287,7 @@ export function UnifiedUpload({
           >
             {isLoading ? "Processing..." : "Create Update"}
           </Button>
-        </div>
+        </form>
       </CardContent>
     </Card>
   );

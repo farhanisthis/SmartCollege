@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "./lib/auth.tsx";
 import { ThemeProvider } from "@/hooks/use-theme";
+import { WebSocketProvider } from "@/contexts/WebSocketContext";
 import Dashboard from "@/pages/dashboard";
 import Login from "@/pages/login";
 import ProtectedRoute from "@/components/auth/protected-route";
@@ -30,8 +31,10 @@ function App() {
       <ThemeProvider defaultTheme="dark" storageKey="smartupdates-ui-theme">
         <TooltipProvider>
           <AuthProvider>
-            <Toaster />
-            <Router />
+            <WebSocketProvider>
+              <Toaster />
+              <Router />
+            </WebSocketProvider>
           </AuthProvider>
         </TooltipProvider>
       </ThemeProvider>

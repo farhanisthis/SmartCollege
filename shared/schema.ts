@@ -32,6 +32,7 @@ export const updates = pgTable("updates", {
   description: text("description"), // AI-generated description
   originalContent: text("original_content"), // Raw content before AI formatting
   category: text("category").notNull(), // "assignments", "notes", "presentations", "general"
+  subject: text("subject"), // Subject for grouping (e.g. "Cloud Computing")
   priority: text("priority").default("normal"), // "normal", "urgent"
   tags: text("tags").array().default([]), // Additional tags
   authorId: varchar("author_id")
@@ -39,6 +40,7 @@ export const updates = pgTable("updates", {
     .references(() => users.id),
   isUrgent: boolean("is_urgent").default(false),
   dueDate: timestamp("due_date"),
+  deadlineDate: timestamp("deadline_date"), // Parsed deadline date for display
   viewCount: integer("view_count").default(0),
   downloadCount: integer("download_count").default(0),
   createdAt: timestamp("created_at").defaultNow(),

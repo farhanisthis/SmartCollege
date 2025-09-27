@@ -16,9 +16,14 @@ import {
   textExtractionService,
   TextExtractionService,
 } from "./services/textExtraction";
+import { getWebSocketService } from "./services/websocket";
 import session from "express-session";
 import multer from "multer";
 import type { Request, Response, NextFunction } from "express";
+import performanceRoutes from "./routes/performance";
+import notificationRoutes from "./routes/notifications";
+import attendanceRoutes from "./routes/attendance";
+import bulkUsersRoutes from "./routes/bulk-users";
 
 // File upload error handler
 const handleUploadError = (
@@ -239,6 +244,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(500).json({ message: "Failed to delete update" });
         }
 
+        // Broadcast update deletion via WebSocket
+        try {
+          const webSocketService = getWebSocketService();
+          webSocketService.broadcastUpdateChange(update, "deleted");
+        } catch (wsError) {
+          console.error("WebSocket broadcast error:", wsError);
+          // Don't fail the deletion if WebSocket fails
+        }
+
         res.json({ message: "Update deleted successfully" });
       } catch (error) {
         console.error("Delete update error:", error);
@@ -331,6 +345,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           category: detectedCategory,
           isUrgent: detectedIsUrgent,
           dueDate: detectedDueDate,
+          deadlineDate: detectedDeadlineDate,
           tags,
         } = processed;
         console.log("[updates] AI pipeline complete");
@@ -344,6 +359,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           authorId: req.session.userId!,
           isUrgent: detectedIsUrgent,
           dueDate: detectedDueDate ? new Date(detectedDueDate) : undefined,
+          deadlineDate: detectedDeadlineDate
+            ? new Date(detectedDeadlineDate)
+            : undefined,
           tags: tags || [],
         };
 
@@ -366,6 +384,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const completeUpdate = await storage.getUpdate(update.id);
         console.log("[updates] Complete update ready");
+
+        // Broadcast new update via WebSocket
+        if (completeUpdate) {
+          try {
+            const webSocketService = getWebSocketService();
+            webSocketService.broadcastNewUpdate(completeUpdate);
+            console.log("[updates] WebSocket broadcast sent");
+          } catch (wsError) {
+            console.error("WebSocket broadcast error:", wsError);
+            // Don't fail the creation if WebSocket fails
+          }
+        }
+
         res.status(201).json(completeUpdate);
       } catch (error) {
         console.error("Create update error:", error);
@@ -466,17 +497,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
           description: processed.description,
           originalContent: contextText || "",
           category: processed.category.category,
+          subject: processed.subject || null,
           priority: processed.category.isUrgent ? "urgent" : "normal",
           authorId: req.session.userId!,
           isUrgent: processed.category.isUrgent,
           dueDate: processed.category.dueDate
             ? new Date(processed.category.dueDate)
             : undefined,
+          deadlineDate: processed.category.deadlineDate
+            ? new Date(processed.category.deadlineDate)
+            : undefined,
           tags: processed.category.tags || [],
         };
 
+        console.log("[unified-upload] UpdateData being sent to storage:", {
+          title: updateData.title,
+          subject: updateData.subject,
+          category: updateData.category,
+          dueDate: updateData.dueDate,
+          deadlineDate: updateData.deadlineDate,
+          isUrgent: updateData.isUrgent,
+          tags: updateData.tags,
+        });
+
         const update = await storage.createUpdate(updateData);
-        console.log("[unified-upload] Update created in storage");
+        console.log("[unified-upload] Update created in storage:", {
+          id: update.id,
+          subject: update.subject,
+          title: update.title,
+        });
 
         // Save files to storage
         if (files && files.length > 0) {
@@ -484,7 +533,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           for (const file of files) {
             await storage.createFile({
               updateId: update.id,
-              filename: `${Date.now()}-${file.originalname}`,
+              filename: file.filename, // Use the actual filename from multer
               originalName: file.originalname,
               mimeType: file.mimetype,
               size: file.size,
@@ -496,6 +545,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const completeUpdate = await storage.getUpdate(update.id);
         console.log("[unified-upload] Complete update ready");
+
+        // Broadcast new update via WebSocket
+        if (completeUpdate) {
+          try {
+            const webSocketService = getWebSocketService();
+            webSocketService.broadcastNewUpdate(completeUpdate);
+            console.log("[unified-upload] WebSocket broadcast sent");
+          } catch (wsError) {
+            console.error("WebSocket broadcast error:", wsError);
+            // Don't fail the creation if WebSocket fails
+          }
+        }
 
         res.status(201).json({
           update: completeUpdate,
@@ -637,7 +698,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { filename } = req.params;
       const filePath = getFilePath(filename);
 
+      console.log(
+        "File request for:",
+        filename,
+        "from user:",
+        req.session.userId
+      );
+
       if (!fs.existsSync(filePath)) {
+        console.log("File not found:", filePath);
         return res.status(404).json({ message: "File not found" });
       }
 
@@ -651,6 +720,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Increment download count only for actual downloads
         await storage.incrementDownloadCount(file.updateId);
       }
+
+      console.log(
+        "Serving file:",
+        filename,
+        "download mode:",
+        download,
+        "MIME type:",
+        file?.mimeType
+      );
 
       // Set appropriate headers for inline viewing vs download
       if (download) {
@@ -687,7 +765,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { filename } = req.params;
       const filePath = getFilePath(filename);
 
+      console.log(
+        "Preview request for:",
+        filename,
+        "from user:",
+        req.session.userId
+      );
+
       if (!fs.existsSync(filePath)) {
+        console.log("File not found:", filePath);
         return res.status(404).json({ message: "File not found" });
       }
 
@@ -697,10 +783,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Force inline display for preview with minimal headers
       res.setHeader("Content-Disposition", "inline");
+      res.setHeader("X-Frame-Options", "SAMEORIGIN");
+      res.setHeader("Content-Security-Policy", "frame-ancestors 'self'");
 
       if (file?.mimeType) {
         res.setHeader("Content-Type", file.mimeType);
       }
+
+      console.log(
+        "Serving preview file:",
+        filename,
+        "with MIME type:",
+        file?.mimeType
+      );
 
       // Send file
       res.sendFile(path.resolve(filePath));
@@ -708,6 +803,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("File preview error:", error);
       res.status(500).json({ message: "Failed to preview file" });
     }
+  });
+
+  // Debug endpoint to test authentication
+  app.get("/api/debug/auth", requireAuth, async (req, res) => {
+    res.json({
+      message: "Authentication working",
+      userId: req.session.userId,
+      userRole: req.session.userRole,
+    });
   });
 
   // Admin endpoint to regenerate descriptions for existing updates
@@ -815,6 +919,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to get dashboard stats" });
     }
   });
+
+  // Debug endpoint (no auth required) to check updates
+  app.get("/api/debug/check-assignments", async (req, res) => {
+    try {
+      const { UpdateModel } = await import("./models/mongodb");
+      const assignments = await UpdateModel.find({
+        category: "assignments",
+      }).lean();
+
+      res.json({
+        count: assignments.length,
+        assignments: assignments.map((a) => ({
+          id: a._id,
+          title: a.title,
+          dueDate: a.dueDate,
+          category: a.category,
+          subject: a.subject,
+        })),
+      });
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
+  // Performance tracking routes
+  app.use("/api/performance", performanceRoutes);
+
+  // Notification routes
+  app.use("/api/notifications", notificationRoutes);
+
+  // Attendance routes
+  app.use("/api/attendance", attendanceRoutes);
+
+  // Bulk user management routes
+  app.use("/api/bulk-users", bulkUsersRoutes);
 
   const httpServer = createServer(app);
   return httpServer;

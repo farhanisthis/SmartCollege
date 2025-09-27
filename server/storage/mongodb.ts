@@ -16,6 +16,10 @@ import {
   UpdateModel,
   FileModel,
   UserViewModel,
+  AssignmentSubmissionModel,
+  AttendanceModel,
+  PresentationModel,
+  PerformanceMetricsModel,
   type IUserDocument,
   type IUpdateDocument,
   type IFileDocument,
@@ -75,7 +79,7 @@ export class MongoStorage implements IStorage {
         // Create sample CR user
         const crUser = new UserModel({
           _id: randomUUID(),
-          username: "farhanisthis@gmail.com",
+          username: "farhanisthis",
           password: "123456", // In production, this would be hashed
           role: "cr",
           name: "Farhan Ali",
@@ -84,23 +88,307 @@ export class MongoStorage implements IStorage {
         });
         await crUser.save();
 
+        // Create second CR user - Kashish
+        const kashishUser = new UserModel({
+          _id: randomUUID(),
+          username: "kashish",
+          password: "123123", // In production, this would be hashed
+          role: "cr",
+          name: "Kashish",
+          class: "Computer Science - Semester 5",
+          createdAt: new Date(),
+        });
+        await kashishUser.save();
+
         // Create sample student user
         const studentUser = new UserModel({
           _id: randomUUID(),
-          username: "john.student",
-          password: "password123",
+          username: "rohit",
+          password: "123123",
           role: "student",
-          name: "John Doe",
+          name: "Rohit",
           class: "Computer Science - Semester 5",
           createdAt: new Date(),
         });
         await studentUser.save();
 
+        // Initialize sample performance data
+        await this.initializeSamplePerformanceData(
+          [crUser._id, kashishUser._id],
+          [studentUser._id]
+        );
+
         console.log("Sample data initialized successfully");
+      } else {
+        // Check if Kashish user exists, if not add it
+        const kashishExists = await UserModel.findOne({ username: "kashish" });
+        if (!kashishExists) {
+          console.log("Adding new CR user: Kashish");
+          const kashishUser = new UserModel({
+            _id: randomUUID(),
+            username: "kashish",
+            password: "123123", // In production, this would be hashed
+            role: "cr",
+            name: "Kashish",
+            class: "Computer Science - Semester 5",
+            createdAt: new Date(),
+          });
+          await kashishUser.save();
+          console.log("Kashish user added successfully");
+        }
+
+        // Always check and create performance data if missing
+        const performanceCount = await PerformanceMetricsModel.countDocuments();
+        if (performanceCount === 0) {
+          console.log("Initializing missing performance data...");
+          const crUsers = await UserModel.find({ role: "cr" });
+          const studentUsers = await UserModel.find({ role: "student" });
+
+          if (crUsers.length > 0 && studentUsers.length > 0) {
+            await this.initializeSamplePerformanceData(
+              crUsers.map((u) => u._id),
+              studentUsers.map((u) => u._id)
+            );
+          }
+        }
       }
     } catch (error) {
       console.error("Error initializing sample data:", error);
     }
+  }
+
+  public async initializeSamplePerformanceData(
+    crIds: any[],
+    studentIds: any[]
+  ) {
+    console.log("Initializing sample performance data...");
+
+    // Create attendance records for the past 30 days
+    const today = new Date();
+    for (let i = 0; i < 30; i++) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+
+      for (const studentId of studentIds) {
+        // 85% attendance rate - randomly miss some days
+        const isPresent = Math.random() > 0.15;
+
+        const attendance = new AttendanceModel({
+          _id: randomUUID(),
+          userId: studentId,
+          date: date,
+          status: isPresent
+            ? "present"
+            : Math.random() > 0.5
+            ? "absent"
+            : "late",
+          subject: [
+            "Mathematics",
+            "Physics",
+            "Chemistry",
+            "English",
+            "Computer Science",
+          ][Math.floor(Math.random() * 5)],
+          markedBy: crIds[0],
+          markedAt: new Date(),
+        });
+
+        await attendance.save();
+      }
+    }
+
+    // Create some sample updates for assignments and presentations
+    const assignments = [
+      {
+        title: "Linear Algebra Problem Set",
+        category: "assignments",
+        subject: "Mathematics",
+        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Due in 7 days
+      },
+      {
+        title: "Physics Lab Report - Mechanics",
+        category: "assignments",
+        subject: "Physics",
+        dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // Due in 3 days
+      },
+      {
+        title: "Organic Chemistry Assignment",
+        category: "assignments",
+        subject: "Chemistry",
+        dueDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000), // Due in 10 days
+      },
+      {
+        title: "Essay on Modern Literature",
+        category: "assignments",
+        subject: "English",
+        dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // Due in 5 days
+      },
+      {
+        title: "Data Structures Implementation",
+        category: "assignments",
+        subject: "Computer Science",
+        dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // Due in 14 days
+      },
+    ];
+
+    const presentations = [
+      {
+        title: "Quantum Mechanics Fundamentals",
+        category: "presentations",
+        subject: "Physics",
+      },
+      {
+        title: "Environmental Impact of Technology",
+        category: "presentations",
+        subject: "Computer Science",
+      },
+      {
+        title: "Shakespearean Sonnets Analysis",
+        category: "presentations",
+        subject: "English",
+      },
+    ];
+
+    const allUpdates = [...assignments, ...presentations];
+
+    // Create update records for assignments and presentations
+    for (const updateData of allUpdates) {
+      const update = new (await import("../models/mongodb")).UpdateModel({
+        _id: randomUUID(),
+        title: updateData.title,
+        content: `This is ${
+          updateData.category === "assignments"
+            ? "an assignment"
+            : "a presentation"
+        } for ${updateData.subject}.`,
+        category: updateData.category,
+        subject: updateData.subject,
+        authorId: crIds[0],
+        createdAt: new Date(
+          Date.now() - Math.random() * 14 * 24 * 60 * 60 * 1000
+        ),
+        updatedAt: new Date(),
+      });
+
+      await update.save();
+
+      // Create assignment submissions or presentation records for each student
+      for (const studentId of studentIds) {
+        if (updateData.category === "assignments") {
+          // Only submit 50% of assignments randomly, leaving 50% pending
+          const shouldSubmit = Math.random() < 0.5;
+
+          if (shouldSubmit) {
+            const scorePercentage = 0.6 + Math.random() * 0.4; // 60-100% score range
+            const score = Math.round(100 * scorePercentage);
+
+            const submission = new AssignmentSubmissionModel({
+              _id: randomUUID(),
+              updateId: update._id,
+              userId: studentId,
+              submittedAt: new Date(
+                Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000
+              ),
+              status: Math.random() > 0.1 ? "submitted" : "late",
+              score,
+              feedback:
+                score > 80
+                  ? "Excellent work! Well structured and comprehensive."
+                  : score > 60
+                  ? "Good effort. Some areas need improvement."
+                  : "Please review the concepts and resubmit if possible.",
+            });
+
+            await submission.save();
+          }
+          // If shouldSubmit is false, no submission is created = pending assignment
+        } else {
+          // Presentation: Only mark 50% as completed, rest as scheduled (pending)
+          const isCompleted = Math.random() < 0.5;
+          let status = isCompleted ? "completed" : "scheduled";
+          let score = undefined;
+          let feedback = undefined;
+          if (isCompleted) {
+            const scorePercentage = 0.65 + Math.random() * 0.35; // 65-100% score range
+            score = Math.round(100 * scorePercentage);
+            feedback =
+              score > 85
+                ? "Outstanding presentation! Clear delivery and excellent content."
+                : score > 70
+                ? "Good presentation. Work on confidence and eye contact."
+                : "Needs improvement in content organization and delivery.";
+          }
+          const presentationRecord = new PresentationModel({
+            _id: randomUUID(),
+            updateId: update._id,
+            userId: studentId,
+            scheduledDate: new Date(
+              Date.now() - Math.random() * 14 * 24 * 60 * 60 * 1000
+            ),
+            status,
+            score,
+            feedback,
+            duration: 15 + Math.floor(Math.random() * 15), // 15-30 minutes
+          });
+
+          await presentationRecord.save();
+        }
+      }
+    }
+
+    // Create performance metrics for each student
+    for (const studentId of studentIds) {
+      const attendanceRecords = await AttendanceModel.find({
+        userId: studentId,
+      });
+      const attendancePercentage =
+        attendanceRecords.length > 0
+          ? (attendanceRecords.filter((a) => a.status === "present").length /
+              attendanceRecords.length) *
+            100
+          : 0;
+
+      const assignmentSubmissions = await AssignmentSubmissionModel.find({
+        userId: studentId,
+      });
+      const assignmentCompletion =
+        assignmentSubmissions.length > 0
+          ? assignmentSubmissions.reduce(
+              (sum, sub) => sum + (sub.score || 0),
+              0
+            ) / assignmentSubmissions.length
+          : 0;
+
+      const presentationRecords = await PresentationModel.find({
+        userId: studentId,
+      });
+      const presentationScore =
+        presentationRecords.length > 0
+          ? presentationRecords.reduce(
+              (sum, pres) => sum + (pres.score || 0),
+              0
+            ) / presentationRecords.length
+          : 0;
+
+      const overallScore =
+        attendancePercentage * 0.3 +
+        assignmentCompletion * 0.5 +
+        presentationScore * 0.2;
+
+      const metrics = new PerformanceMetricsModel({
+        _id: randomUUID(),
+        userId: studentId,
+        attendancePercentage: Math.round(attendancePercentage * 10) / 10,
+        assignmentCompletion: Math.round(assignmentCompletion * 10) / 10,
+        presentationScore: Math.round(presentationScore * 10) / 10,
+        overallScore: Math.round(overallScore * 10) / 10,
+        lastUpdated: new Date(),
+      });
+
+      await metrics.save();
+    }
+
+    console.log("Sample performance data initialized successfully");
   }
 
   // User methods
@@ -472,11 +760,13 @@ export class MongoStorage implements IStorage {
       description: doc.description,
       originalContent: doc.originalContent,
       category: doc.category,
+      subject: doc.subject,
       priority: doc.priority,
       tags: doc.tags,
       authorId: doc.authorId,
       isUrgent: doc.isUrgent,
       dueDate: doc.dueDate,
+      deadlineDate: doc.deadlineDate,
       viewCount: doc.viewCount,
       downloadCount: doc.downloadCount,
       createdAt: doc.createdAt,
