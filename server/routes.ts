@@ -1210,7 +1210,7 @@ Please provide a well-formatted, enhanced version with:
       heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024),
       external: Math.round(memUsage.external / 1024 / 1024),
     };
-    
+
     res.json({
       memory: memUsageMB,
       uptime: Math.round(process.uptime()),

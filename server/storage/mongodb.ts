@@ -48,10 +48,12 @@ export class MongoStorage implements IStorage {
         maxPoolSize: 3, // REDUCED: Maintain up to 3 socket connections (was 10)
         minPoolSize: 1, // Maintain at least 1 socket connection
         maxIdleTimeMS: 15000, // REDUCED: Close connections after 15 seconds (was 30)
-        bufferMaxEntries: 0, // Disable mongoose buffering
       };
 
       await mongoose.connect(mongoUri, options);
+      
+      // MEMORY OPTIMIZATION: Disable mongoose buffering (this is the correct way)
+      mongoose.set('bufferCommands', false);
       console.log("Connected to MongoDB successfully");
       this.isConnected = true;
 

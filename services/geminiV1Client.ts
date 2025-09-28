@@ -8,6 +8,22 @@ export interface GeminiV1Response {
   model?: string;
 }
 
+// Type definition for Gemini API response
+interface GeminiAPIResponse {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{
+        text?: string;
+      }>;
+    };
+  }>;
+  error?: {
+    code: number;
+    message: string;
+    status: string;
+  };
+}
+
 export class GeminiV1Client {
   private apiKey: string;
   private baseUrl = "https://generativelanguage.googleapis.com/v1";
@@ -51,7 +67,7 @@ export class GeminiV1Client {
         );
       }
 
-      const result = await response.json();
+      const result = await response.json() as GeminiAPIResponse;
 
       // Extract text from Gemini response structure
       const text =
