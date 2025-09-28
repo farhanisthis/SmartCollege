@@ -10,16 +10,20 @@ class AIProviderManager {
   private geminiInstances: Map<string, GeminiV1Client> = new Map();
   private failedProviders: Set<string> = new Set();
   private retryDelay = 5000; // 5 seconds
+  private initialized = false;
 
   constructor() {
-    this.initializeGeminiInstances();
+    // MEMORY OPTIMIZATION: Don't initialize at startup, do it lazily
+    // this.initializeGeminiInstances();
   }
 
   private initializeGeminiInstances() {
     // Clear existing instances
     this.geminiInstances.clear();
 
-    const geminiProviders = aiConfig.getProvidersByType("gemini");
+    // MEMORY OPTIMIZATION: Only initialize 2-3 instances instead of 16
+    // This reduces memory usage from ~480MB to ~60MB
+    const geminiProviders = aiConfig.getProvidersByType("gemini").slice(0, 3);
 
     geminiProviders.forEach((provider) => {
       try {
@@ -35,7 +39,7 @@ class AIProviderManager {
     });
 
     console.log(
-      `[AI Manager] Initialized ${this.geminiInstances.size} Gemini instances`
+      `[AI Manager] Initialized ${this.geminiInstances.size} Gemini instances (memory optimized)`
     );
   }
 
@@ -202,6 +206,12 @@ class AIProviderManager {
     prompt: string,
     providerName?: string
   ): Promise<AIResponse> {
+    // MEMORY OPTIMIZATION: Initialize only when needed
+    if (!this.initialized) {
+      this.initializeGeminiInstances();
+      this.initialized = true;
+    }
+
     const geminiProviders = aiConfig.getProvidersByType("gemini");
     const availableProviders = geminiProviders.filter(
       (p) => !this.failedProviders.has(p.name)

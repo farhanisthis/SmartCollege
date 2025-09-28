@@ -41,13 +41,14 @@ export class MongoStorage implements IStorage {
         throw new Error("MONGODB_URI environment variable is not set");
       }
 
-      // Simplified connection options for better compatibility
+      // MEMORY OPTIMIZED: Reduced connection pool for low-memory environments
       const options = {
         serverSelectionTimeoutMS: 10000, // 10 second timeout
         socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
-        maxPoolSize: 10, // Maintain up to 10 socket connections
+        maxPoolSize: 3, // REDUCED: Maintain up to 3 socket connections (was 10)
         minPoolSize: 1, // Maintain at least 1 socket connection
-        maxIdleTimeMS: 30000, // Close connections after 30 seconds of inactivity
+        maxIdleTimeMS: 15000, // REDUCED: Close connections after 15 seconds (was 30)
+        bufferMaxEntries: 0, // Disable mongoose buffering
       };
 
       await mongoose.connect(mongoUri, options);

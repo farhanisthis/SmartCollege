@@ -1201,6 +1201,23 @@ Please provide a well-formatted, enhanced version with:
   // Bulk user management routes
   app.use("/api/bulk-users", bulkUsersRoutes);
 
+  // Memory monitoring endpoint for debugging
+  app.get("/api/health/memory", (req, res) => {
+    const memUsage = process.memoryUsage();
+    const memUsageMB = {
+      rss: Math.round(memUsage.rss / 1024 / 1024), // Resident Set Size
+      heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024),
+      heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024),
+      external: Math.round(memUsage.external / 1024 / 1024),
+    };
+    
+    res.json({
+      memory: memUsageMB,
+      uptime: Math.round(process.uptime()),
+      aiInstances: aiManager.getStatus().geminiInstancesInitialized,
+    });
+  });
+
   // OCR test page route
   app.get("/test-ocr", (req, res) => {
     const htmlPath = path.join(process.cwd(), "test-enhanced-ocr.html");

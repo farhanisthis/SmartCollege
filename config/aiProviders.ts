@@ -43,8 +43,8 @@ class AIProvidersConfig {
       }
     }
 
-    // Load Gemini providers (now supporting up to 16 keys)
-    for (let i = 1; i <= 16; i++) {
+    // Load Gemini providers (MEMORY OPTIMIZED: only load first 3 keys)
+    for (let i = 1; i <= 3; i++) {
       const geminiKey = process.env[`GEMINI_KEY_${i}`];
       if (geminiKey) {
         this.providers.push({
