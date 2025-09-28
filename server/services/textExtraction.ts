@@ -3,6 +3,11 @@ import mammoth from "mammoth";
 import { createWorker } from "tesseract.js";
 import fs from "fs";
 import path from "path";
+import { ocrSpaceService, type OcrSpaceResult } from "./ocrSpaceService";
+import {
+  attendanceTextParser,
+  type AttendanceParseResult,
+} from "./attendanceTextParser";
 
 export interface ExtractedText {
   content: string;
@@ -14,7 +19,11 @@ export interface ExtractedText {
     creator?: string;
     producer?: string;
     creationDate?: string;
+    ocrStrategy?: string;
+    ocrScore?: number;
+    extractionType?: string;
   };
+  attendanceData?: AttendanceParseResult;
 }
 
 export class TextExtractionService {
@@ -68,12 +77,208 @@ export class TextExtractionService {
   }
 
   /**
-   * Extract text from images using OCR
+   * Extract text from images using OCR with multiple strategies for attendance sheets
    */
   async extractFromImage(filePath: string): Promise<ExtractedText> {
+    console.log(
+      `[OCR] Starting text extraction from: ${path.basename(filePath)}`
+    );
+
+    // Check if this looks like an attendance sheet
+    const isAttendanceSheet = this.isAttendanceSheet(filePath);
+
+    if (isAttendanceSheet) {
+      return this.extractFromAttendanceSheet(filePath);
+    } else {
+      return this.extractFromGeneralImage(filePath);
+    }
+  }
+
+  /**
+   * Enhanced OCR extraction specifically for attendance sheets
+   */
+  private async extractFromAttendanceSheet(
+    filePath: string
+  ): Promise<ExtractedText> {
+    console.log(
+      `[OCR] Using attendance-optimized extraction for: ${path.basename(
+        filePath
+      )}`
+    );
+
+    const strategies = [
+      {
+        name: "OCR Space Engine 1",
+        type: "ocrspace",
+        config: {
+          engine: 1 as const,
+          isTable: true,
+          detectOrientation: true,
+          scale: true,
+        },
+      },
+      {
+        name: "OCR Space Engine 2",
+        type: "ocrspace",
+        config: {
+          engine: 2 as const,
+          isTable: true,
+          detectOrientation: true,
+          scale: true,
+        },
+      },
+      {
+        name: "Table Optimized",
+        type: "tesseract",
+        config: {
+          logger: (_m: any) => {}, // Suppress tesseract logs
+          psm: 6, // Single uniform block of vertically aligned text
+          preserve_interword_spaces: "1",
+          tessjs_create_pdf: "0",
+          tessjs_create_hocr: "0",
+        },
+      },
+      {
+        name: "Column Recognition",
+        type: "tesseract",
+        config: {
+          logger: (_m: any) => {},
+          psm: 4, // Single column of text of variable sizes
+          preserve_interword_spaces: "1",
+          tessjs_create_pdf: "0",
+        },
+      },
+      {
+        name: "Sparse Text",
+        type: "tesseract",
+        config: {
+          logger: (_m: any) => {},
+          psm: 11, // Sparse text - find as much text as possible
+          preserve_interword_spaces: "1",
+        },
+      },
+      {
+        name: "Auto Segmentation",
+        type: "tesseract",
+        config: {
+          logger: (_m: any) => {},
+          psm: 3, // Fully automatic page segmentation
+          preserve_interword_spaces: "1",
+        },
+      },
+    ];
+
+    let bestResult = "";
+    let bestScore = 0;
+    let bestStrategy = "Unknown";
+
+    for (const strategy of strategies) {
+      try {
+        console.log(`[OCR] Trying ${strategy.name} strategy...`);
+        let text = "";
+
+        if (strategy.type === "ocrspace") {
+          // Use OCR Space API
+          const result: OcrSpaceResult = await ocrSpaceService.extractText(
+            filePath,
+            strategy.config
+          );
+          if (result.success) {
+            text = result.content;
+            console.log(
+              `[OCR] ${strategy.name}: ${text.length} chars, confidence: ${result.confidence}%`
+            );
+          } else {
+            console.error(`[OCR] ${strategy.name} failed: ${result.error}`);
+            continue;
+          }
+        } else {
+          // Use Tesseract.js
+          let worker;
+          try {
+            worker = await createWorker("eng");
+            await worker.setParameters(strategy.config);
+
+            const {
+              data: { text: tesseractText },
+            } = await worker.recognize(filePath);
+            text = tesseractText;
+          } finally {
+            if (worker) {
+              await worker.terminate();
+            }
+          }
+        }
+
+        // Score the result based on attendance sheet characteristics
+        const score = this.scoreAttendanceText(text);
+        console.log(
+          `[OCR] ${strategy.name}: ${text.length} chars, score: ${score}`
+        );
+
+        if (
+          score > bestScore ||
+          (score === bestScore && text.length > bestResult.length)
+        ) {
+          bestResult = text;
+          bestScore = score;
+          bestStrategy = strategy.name;
+        }
+      } catch (error) {
+        console.error(`[OCR] ${strategy.name} strategy failed:`, error);
+      }
+    }
+
+    console.log(
+      `[OCR] Best result from ${bestStrategy} strategy: ${bestResult.length} characters, score: ${bestScore}`
+    );
+
+    if (!bestResult || bestResult.trim().length === 0) {
+      throw new Error("No text could be extracted from the attendance sheet");
+    }
+
+    // Parse the OCR text into structured attendance data using AI
+    let attendanceData: AttendanceParseResult | undefined;
+    try {
+      console.log(`[AI] Parsing OCR text into structured attendance data...`);
+      attendanceData = await attendanceTextParser.parseAttendanceText(
+        bestResult
+      );
+      console.log(
+        `[AI] Successfully parsed attendance data: ${
+          attendanceData.success ? attendanceData.data?.length || 0 : 0
+        } students found`
+      );
+    } catch (error) {
+      console.error(`[AI] Failed to parse attendance data:`, error);
+      // Continue without parsed data - raw OCR text is still available
+    }
+
+    return {
+      content: bestResult,
+      attendanceData,
+      metadata: {
+        title: this.extractTitleFromContent(bestResult),
+        ocrStrategy: bestStrategy,
+        ocrScore: bestScore,
+        extractionType: "attendance-optimized",
+      },
+    };
+  }
+
+  /**
+   * Standard OCR extraction for general images
+   */
+  private async extractFromGeneralImage(
+    filePath: string
+  ): Promise<ExtractedText> {
     let worker;
     try {
+      console.log(
+        `[OCR] Using general image extraction for: ${path.basename(filePath)}`
+      );
       worker = await createWorker("eng");
+
       const {
         data: { text },
       } = await worker.recognize(filePath);
@@ -82,6 +287,7 @@ export class TextExtractionService {
         content: text,
         metadata: {
           title: this.extractTitleFromContent(text),
+          extractionType: "general",
         },
       };
     } catch (error) {
@@ -93,6 +299,69 @@ export class TextExtractionService {
         await worker.terminate();
       }
     }
+  }
+
+  /**
+   * Determine if an image is likely an attendance sheet
+   */
+  private isAttendanceSheet(filePath: string): boolean {
+    const fileName = path.basename(filePath).toLowerCase();
+    const attendanceKeywords = [
+      "attendance",
+      "present",
+      "absent",
+      "roll",
+      "student",
+      "class",
+      "roster",
+      "register",
+      "enroll",
+      "screenshot",
+    ];
+
+    return attendanceKeywords.some((keyword) => fileName.includes(keyword));
+  }
+
+  /**
+   * Score extracted text based on attendance sheet characteristics
+   */
+  private scoreAttendanceText(text: string): number {
+    let score = 0;
+
+    // Look for enrollment numbers (11 digits)
+    const enrollmentNumbers = text.match(/\b\d{11}\b/g) || [];
+    score += enrollmentNumbers.length * 10; // High weight for enrollment numbers
+
+    // Look for student names (capitalized words)
+    const capitalizedWords =
+      text.match(/\b[A-Z][a-z]+(\s+[A-Z][a-z]+)*\b/g) || [];
+    score += Math.min(capitalizedWords.length, 20) * 2; // Cap at 20 names
+
+    // Look for attendance markers
+    const attendanceMarkers = text.match(/\b[PAL]\b/g) || []; // Present, Absent, Late
+    score += attendanceMarkers.length * 1;
+
+    // Look for common attendance sheet headers
+    const headers = ["name", "enroll", "roll", "student", "present", "absent"];
+    headers.forEach((header) => {
+      if (text.toLowerCase().includes(header)) {
+        score += 5;
+      }
+    });
+
+    // Penalty for very short text (likely failed extraction)
+    if (text.length < 50) {
+      score *= 0.5;
+    }
+
+    // Bonus for structured text (contains numbers and letters)
+    const hasNumbers = /\d/.test(text);
+    const hasLetters = /[a-zA-Z]/.test(text);
+    if (hasNumbers && hasLetters) {
+      score += 10;
+    }
+
+    return Math.round(score);
   }
 
   /**

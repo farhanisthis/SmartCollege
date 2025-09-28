@@ -24,6 +24,8 @@ import {
   File,
   Trash2,
   X,
+  Sparkles,
+  RefreshCw,
 } from "lucide-react";
 import { UpdateWithAuthor } from "@shared/schema";
 import { formatDistanceToNow, format, isValid } from "date-fns";
@@ -149,6 +151,10 @@ export default function UpdateCard({ update, onRefresh }: UpdateCardProps) {
     isBlob?: boolean;
   } | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [enhancedDescription, setEnhancedDescription] = useState<string | null>(
+    null
+  );
+  const [isEnhancing, setIsEnhancing] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -220,6 +226,41 @@ export default function UpdateCard({ update, onRefresh }: UpdateCardProps) {
         title: "Link copied",
         description: "Update link copied to clipboard.",
       });
+    }
+  };
+
+  const handleEnhanceDescription = async () => {
+    setIsEnhancing(true);
+    try {
+      const response = await fetch(`/api/updates/${update.id}/enhance`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to enhance description");
+      }
+
+      const result = await response.json();
+      setEnhancedDescription(result.enhancedDescription);
+
+      toast({
+        title: "Description enhanced",
+        description:
+          "The description has been improved with better formatting and details.",
+      });
+    } catch (error) {
+      console.error("Error enhancing description:", error);
+      toast({
+        title: "Enhancement failed",
+        description: "Could not enhance the description. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsEnhancing(false);
     }
   };
 
@@ -794,80 +835,103 @@ export default function UpdateCard({ update, onRefresh }: UpdateCardProps) {
 
               {/* Content */}
               <div>
-                <h3 className="font-semibold mb-3 text-lg">Description</h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-lg">Description</h3>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleEnhanceDescription}
+                    disabled={isEnhancing}
+                    className="text-xs"
+                  >
+                    {isEnhancing ? (
+                      <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-3 w-3 mr-1" />
+                    )}
+                    {isEnhancing ? "Enhancing..." : "Enhance"}
+                  </Button>
+                </div>
                 <div className="bg-muted/30 rounded-lg p-6 border border-muted">
                   <div className="prose prose-sm max-w-none">
                     <div className="leading-relaxed text-foreground text-base space-y-2">
-                      {update.content.split("\n").map((line, index) => {
-                        const trimmedLine = line.trim();
+                      {/* Use enhanced description if available, then regular description, then fall back to content */}
+                      {(
+                        enhancedDescription ||
+                        update.description ||
+                        update.content
+                      )
+                        .split("\n")
+                        .map((line, index) => {
+                          const trimmedLine = line.trim();
 
-                        // Empty line
-                        if (!trimmedLine) {
-                          return <div key={index} className="h-2" />;
-                        }
+                          // Empty line
+                          if (!trimmedLine) {
+                            return <div key={index} className="h-2" />;
+                          }
 
-                        // Bullet points
-                        if (
-                          trimmedLine.startsWith("•") ||
-                          trimmedLine.startsWith("-") ||
-                          trimmedLine.startsWith("*")
-                        ) {
-                          return (
-                            <div
-                              key={index}
-                              className="flex items-start space-x-3 my-2"
-                            >
-                              <span className="text-primary mt-1 flex-shrink-0 font-semibold">
-                                •
-                              </span>
-                              <span className="flex-1">
-                                {trimmedLine.substring(1).trim()}
-                              </span>
-                            </div>
-                          );
-                        }
-
-                        // Numbered lists
-                        if (/^\d+\./.test(trimmedLine)) {
-                          const match = trimmedLine.match(/^(\d+)\.\s*(.*)$/);
-                          if (match) {
+                          // Bullet points
+                          if (
+                            trimmedLine.startsWith("•") ||
+                            trimmedLine.startsWith("-") ||
+                            trimmedLine.startsWith("*")
+                          ) {
                             return (
                               <div
                                 key={index}
                                 className="flex items-start space-x-3 my-2"
                               >
                                 <span className="text-primary mt-1 flex-shrink-0 font-semibold">
-                                  {match[1]}.
+                                  •
                                 </span>
-                                <span className="flex-1">{match[2]}</span>
+                                <span className="flex-1">
+                                  {trimmedLine.substring(1).trim()}
+                                </span>
                               </div>
                             );
                           }
-                        }
 
-                        // Headers (lines that end with : or are in ALL CAPS)
-                        if (
-                          trimmedLine.endsWith(":") ||
-                          (trimmedLine === trimmedLine.toUpperCase() &&
-                            trimmedLine.length > 3)
-                        ) {
+                          // Numbered lists
+                          if (/^\d+\./.test(trimmedLine)) {
+                            const match = trimmedLine.match(/^(\d+)\.\s*(.*)$/);
+                            if (match) {
+                              return (
+                                <div
+                                  key={index}
+                                  className="flex items-start space-x-3 my-2"
+                                >
+                                  <span className="text-primary mt-1 flex-shrink-0 font-semibold">
+                                    {match[1]}.
+                                  </span>
+                                  <span className="flex-1">{match[2]}</span>
+                                </div>
+                              );
+                            }
+                          }
+
+                          // Headers (lines that end with : or are in ALL CAPS)
+                          if (
+                            trimmedLine.endsWith(":") ||
+                            (trimmedLine === trimmedLine.toUpperCase() &&
+                              trimmedLine.length > 3)
+                          ) {
+                            return (
+                              <h4
+                                key={index}
+                                className="font-semibold text-lg mt-4 mb-2 text-foreground"
+                              >
+                                {trimmedLine}
+                              </h4>
+                            );
+                          }
+
+                          // Regular paragraph
                           return (
-                            <h4
-                              key={index}
-                              className="font-semibold text-lg mt-4 mb-2 text-foreground"
-                            >
+                            <p key={index} className="my-2 leading-relaxed">
                               {trimmedLine}
-                            </h4>
+                            </p>
                           );
-                        }
-
-                        // Regular paragraph
-                        return (
-                          <p key={index} className="my-2 leading-relaxed">
-                            {trimmedLine}
-                          </p>
-                        );
-                      })}
+                        })}
                     </div>
                   </div>
                 </div>

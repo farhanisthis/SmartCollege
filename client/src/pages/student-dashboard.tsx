@@ -14,6 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import StudentAttendanceTracker from "@/components/attendance/student-attendance-tracker";
 import {
   AlertCircle,
   CheckCircle,
@@ -244,6 +245,7 @@ const StudentDashboard: React.FC = () => {
   const [activeDetailView, setActiveDetailView] = useState<
     "assignments" | "presentations" | "progress" | null
   >(null);
+  const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false);
   const { user } = useAuth();
 
   const fetchDashboardData = async () => {
@@ -1117,6 +1119,7 @@ const StudentDashboard: React.FC = () => {
             percentage: dashboardData.attendance.percentage,
           }}
           alertThreshold={75}
+          onClick={() => setIsAttendanceDialogOpen(true)}
         />
 
         <PerformanceBox
@@ -1904,6 +1907,22 @@ const StudentDashboard: React.FC = () => {
           onSubmit={handlePresentationSubmit}
         />
       )}
+
+      {/* Attendance Tracker Dialog */}
+      <Dialog
+        open={isAttendanceDialogOpen}
+        onOpenChange={setIsAttendanceDialogOpen}
+      >
+        <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>My Attendance Tracker</DialogTitle>
+            <DialogDescription>
+              Comprehensive view of your attendance records and performance
+            </DialogDescription>
+          </DialogHeader>
+          <StudentAttendanceTracker />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

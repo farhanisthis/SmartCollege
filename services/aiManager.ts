@@ -4,9 +4,10 @@ import {
   type AIProvider,
   type AIResponse,
 } from "../config/aiProviders";
+import { GeminiV1Client } from "./geminiV1Client";
 
 class AIProviderManager {
-  private geminiInstances: Map<string, GoogleGenerativeAI> = new Map();
+  private geminiInstances: Map<string, GeminiV1Client> = new Map();
   private failedProviders: Set<string> = new Set();
   private retryDelay = 5000; // 5 seconds
 
@@ -15,12 +16,15 @@ class AIProviderManager {
   }
 
   private initializeGeminiInstances() {
+    // Clear existing instances
+    this.geminiInstances.clear();
+
     const geminiProviders = aiConfig.getProvidersByType("gemini");
 
     geminiProviders.forEach((provider) => {
       try {
-        const genAI = new GoogleGenerativeAI(provider.apiKey);
-        this.geminiInstances.set(provider.name, genAI);
+        const geminiClient = new GeminiV1Client(provider.apiKey);
+        this.geminiInstances.set(provider.name, geminiClient);
       } catch (error) {
         console.error(
           `[AI Manager] Failed to initialize ${provider.name}:`,
@@ -29,44 +33,78 @@ class AIProviderManager {
         aiConfig.disableProvider(provider.name);
       }
     });
+
+    console.log(
+      `[AI Manager] Initialized ${this.geminiInstances.size} Gemini instances`
+    );
+  }
+
+  // Public method to refresh instances when new keys are added
+  public refreshGeminiInstances() {
+    console.log(`[AI Manager] Refreshing Gemini instances...`);
+    this.initializeGeminiInstances();
   }
 
   async useHuggingFace(
     prompt: string,
-    model = "microsoft/DialoGPT-medium"
+    model?: string,
+    providerName?: string
   ): Promise<AIResponse> {
-    const provider = aiConfig.getProvidersByType("huggingface")[0];
+    const hfProviders = aiConfig.getProvidersByType("huggingface");
+    const availableProviders = hfProviders.filter(
+      (p) => !this.failedProviders.has(p.name)
+    );
 
-    if (!provider || this.failedProviders.has(provider.name)) {
+    if (availableProviders.length === 0) {
       return {
         success: false,
-        error: "Hugging Face provider not available",
-        provider: provider?.name,
+        error: "No Hugging Face providers available",
       };
     }
 
+    // Use specific provider if requested, otherwise use first available
+    const targetProvider = providerName
+      ? availableProviders.find((p) => p.name === providerName)
+      : availableProviders[0];
+
+    if (!targetProvider) {
+      return {
+        success: false,
+        error: `HuggingFace provider ${
+          providerName || "default"
+        } not available`,
+        provider: providerName,
+      };
+    }
+
+    // Choose appropriate model based on task
+    const selectedModel = model || this.selectBestHFModel(prompt);
+
     try {
+      console.log(
+        `[AI Manager] Using HuggingFace ${targetProvider.name} with model ${selectedModel}`
+      );
+
       const response = await fetch(
-        `https://api-inference.huggingface.co/models/${model}`,
+        `https://api-inference.huggingface.co/models/${selectedModel}`,
         {
           headers: {
-            Authorization: `Bearer ${provider.apiKey}`,
+            Authorization: `Bearer ${targetProvider.apiKey}`,
             "Content-Type": "application/json",
           },
           method: "POST",
           body: JSON.stringify({
             inputs: prompt,
-            parameters: {
-              max_length: 512,
-              temperature: 0.7,
-              do_sample: true,
-            },
+            parameters: this.getHFModelParameters(selectedModel, prompt),
           }),
         }
       );
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const errorText = await response.text();
+        throw new Error(
+          `HTTP ${response.status}: ${response.statusText}. ${errorText}`
+        );
       }
 
       const result = await response.json();
@@ -75,30 +113,88 @@ class AIProviderManager {
         throw new Error(result.error);
       }
 
-      const generatedText = Array.isArray(result)
-        ? result[0]?.generated_text ||
-          result[0]?.summary_text ||
-          JSON.stringify(result[0])
-        : result.generated_text ||
-          result.summary_text ||
-          JSON.stringify(result);
+      const generatedText = this.extractHFResponse(result, selectedModel);
 
       return {
         success: true,
         data: generatedText,
-        provider: provider.name,
-        model,
+        provider: targetProvider.name,
+        model: selectedModel,
       };
     } catch (error) {
-      console.error(`[AI Manager] Hugging Face error:`, error);
-      this.markProviderAsFailed(provider.name);
+      console.error(
+        `[AI Manager] Hugging Face error (${targetProvider.name}):`,
+        error
+      );
+      this.markProviderAsFailed(targetProvider.name);
+
+      // Try next provider if available
+      const nextProvider = availableProviders.find(
+        (p) => p.name !== targetProvider.name
+      );
+      if (nextProvider && !this.failedProviders.has(nextProvider.name)) {
+        console.log(`[AI Manager] Retrying with ${nextProvider.name}...`);
+        return this.useHuggingFace(prompt, model, nextProvider.name);
+      }
 
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error),
-        provider: provider.name,
+        provider: targetProvider.name,
       };
     }
+  }
+
+  private selectBestHFModel(prompt: string): string {
+    // Select model based on prompt content
+    if (
+      prompt.toLowerCase().includes("json") ||
+      prompt.toLowerCase().includes("attendance") ||
+      prompt.toLowerCase().includes("parse") ||
+      prompt.toLowerCase().includes("extract")
+    ) {
+      return "facebook/blenderbot-400M-distill"; // Better for structured responses
+    }
+    return "facebook/blenderbot-400M-distill"; // Default
+  }
+
+  private getHFModelParameters(model: string, prompt: string): any {
+    if (model.includes("bart")) {
+      return {
+        max_length: 1024,
+        min_length: 50,
+        do_sample: false,
+      };
+    }
+
+    return {
+      max_length: 2048,
+      temperature: 0.3,
+      do_sample: true,
+      top_p: 0.9,
+      repetition_penalty: 1.1,
+    };
+  }
+
+  private extractHFResponse(result: any, model: string): string {
+    if (Array.isArray(result)) {
+      const item = result[0];
+      if (!item) return "No response generated";
+
+      return (
+        item.generated_text ||
+        item.summary_text ||
+        item.text ||
+        JSON.stringify(item)
+      );
+    }
+
+    return (
+      result.generated_text ||
+      result.summary_text ||
+      result.text ||
+      JSON.stringify(result)
+    );
   }
 
   async useGemini(
@@ -131,19 +227,20 @@ class AIProviderManager {
     }
 
     try {
-      const genAI = this.geminiInstances.get(targetProvider.name);
-      if (!genAI) {
-        throw new Error(`Gemini instance not found for ${targetProvider.name}`);
+      const geminiClient = this.geminiInstances.get(targetProvider.name);
+      if (!geminiClient) {
+        throw new Error(`Gemini client not found for ${targetProvider.name}`);
       }
 
-      const geminiModel = genAI.getGenerativeModel({ model });
-      const result = await geminiModel.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
+      const result = await geminiClient.generateContent(model, prompt);
+
+      if (!result.success) {
+        throw new Error(result.error || "Gemini API call failed");
+      }
 
       return {
         success: true,
-        data: text,
+        data: result.data,
         provider: targetProvider.name,
         model,
       };
@@ -200,7 +297,11 @@ class AIProviderManager {
       let result: AIResponse;
 
       if (provider.type === "huggingface") {
-        result = await this.useHuggingFace(prompt);
+        result = await this.useHuggingFace(
+          prompt,
+          provider.model,
+          provider.name
+        );
       } else {
         result = await this.useGemini(
           provider.model || "gemini-1.5-flash",
@@ -237,15 +338,23 @@ class AIProviderManager {
   getStatus() {
     const allProviders = aiConfig.getProviders();
     const failedCount = this.failedProviders.size;
+    const geminiCount = allProviders.filter((p) => p.type === "gemini").length;
+    const huggingFaceCount = allProviders.filter(
+      (p) => p.type === "huggingface"
+    ).length;
 
     return {
       totalProviders: allProviders.length,
       activeProviders: allProviders.length - failedCount,
       failedProviders: Array.from(this.failedProviders),
+      geminiProviders: geminiCount,
+      huggingFaceProviders: huggingFaceCount,
+      geminiInstancesInitialized: this.geminiInstances.size,
       providers: allProviders.map((p) => ({
         name: p.name,
         type: p.type,
         model: p.model,
+        priority: p.priority,
         status: this.failedProviders.has(p.name) ? "failed" : "active",
       })),
     };
@@ -265,7 +374,11 @@ class AIProviderManager {
       "Hello, this is a test prompt. Please respond with a simple greeting.";
 
     if (provider.type === "huggingface") {
-      return await this.useHuggingFace(testPrompt);
+      return await this.useHuggingFace(
+        testPrompt,
+        provider.model,
+        providerName
+      );
     } else {
       return await this.useGemini(
         provider.model || "gemini-1.5-flash",

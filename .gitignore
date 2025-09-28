@@ -15,7 +15,21 @@ uploads
 debug-*.js
 test-*.js
 test-*.sh
+test-*.cjs
+test-*.html
+test-*.md
 *.traineddata
 nul
 cookies.txt
+*cookies*.txt
 qr-display.html
+
+# Cleanup additions
+backups/
+uploads_backup/
+check-*.cjs
+add-*.cjs
+seed-*.cjs
+verify-*.cjs
+*.py
+cleanup-script.sh

@@ -430,6 +430,97 @@ export class MongoStorage implements IStorage {
     }
   }
 
+  async updateProfile(
+    userId: string,
+    profileData: {
+      name?: string;
+      phone?: string;
+      location?: string;
+      bio?: string;
+      department?: string;
+      year?: string;
+      rollNumber?: string;
+    }
+  ): Promise<User | undefined> {
+    try {
+      await this.ensureConnected();
+      const updatedUser = await UserModel.findByIdAndUpdate(
+        userId,
+        profileData,
+        { new: true }
+      ).lean();
+      return updatedUser ? this.mapUserDocument(updatedUser) : undefined;
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      return undefined;
+    }
+  }
+
+  async updatePreferences(
+    userId: string,
+    preferences: any
+  ): Promise<User | undefined> {
+    try {
+      await this.ensureConnected();
+      const updatedUser = await UserModel.findByIdAndUpdate(
+        userId,
+        { preferences },
+        { new: true }
+      ).lean();
+      return updatedUser ? this.mapUserDocument(updatedUser) : undefined;
+    } catch (error) {
+      console.error("Error updating preferences:", error);
+      return undefined;
+    }
+  }
+
+  async getUserStats(userId: string): Promise<{
+    assignmentsCompleted: number;
+    presentationsDelivered: number;
+    attendancePercentage: number;
+  }> {
+    try {
+      await this.ensureConnected();
+
+      // Count completed assignments (submissions by this user)
+      const assignmentsCompleted =
+        await AssignmentSubmissionModel.countDocuments({
+          userId,
+          status: "submitted",
+        });
+
+      // Count presentations delivered
+      const presentationsDelivered = await PresentationModel.countDocuments({
+        userId,
+        status: "completed",
+      });
+
+      // Calculate attendance percentage
+      const totalAttendance = await AttendanceModel.countDocuments({ userId });
+      const presentAttendance = await AttendanceModel.countDocuments({
+        userId,
+        status: "present",
+      });
+      const attendancePercentage =
+        totalAttendance > 0
+          ? Math.round((presentAttendance / totalAttendance) * 100)
+          : 0;
+
+      return {
+        assignmentsCompleted,
+        presentationsDelivered,
+        attendancePercentage,
+      };
+    } catch (error) {
+      console.error("Error getting user stats:", error);
+      return {
+        assignmentsCompleted: 0,
+        presentationsDelivered: 0,
+        attendancePercentage: 0,
+      };
+    }
+  }
+
   // Update methods
   async getUpdates(filters?: {
     category?: string;
@@ -474,15 +565,15 @@ export class MongoStorage implements IStorage {
         return {
           ...this.mapUpdateDocument(update),
           author: author
-            ? this.mapUserDocument(author)
+            ? {
+                id: author._id,
+                name: author.name,
+                role: author.role,
+              }
             : {
                 id: update.authorId,
                 name: "Unknown User",
                 role: "student",
-                username: "",
-                password: "",
-                class: "",
-                createdAt: new Date(),
               },
           files: updateFiles,
         };
@@ -505,15 +596,15 @@ export class MongoStorage implements IStorage {
       return {
         ...this.mapUpdateDocument(update),
         author: author
-          ? this.mapUserDocument(author)
+          ? {
+              id: author._id,
+              name: author.name,
+              role: author.role,
+            }
           : {
               id: update.authorId,
               name: "Unknown User",
               role: "student",
-              username: "",
-              password: "",
-              class: "",
-              createdAt: new Date(),
             },
         files: files.map((f) => this.mapFileDocument(f)),
       };
@@ -749,6 +840,13 @@ export class MongoStorage implements IStorage {
       name: doc.name,
       class: doc.class,
       createdAt: doc.createdAt,
+      phone: doc.phone,
+      location: doc.location,
+      bio: doc.bio,
+      department: doc.department,
+      year: doc.year,
+      rollNumber: doc.rollNumber,
+      preferences: doc.preferences,
     };
   }
 

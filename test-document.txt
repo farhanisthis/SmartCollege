@@ -1,8 +1,0 @@
-This is a test document for file viewing functionality.
-
-It contains some basic text content to test:
-- File upload
-- File storage
-- File preview functionality
-
-The goal is to ensure files can be viewed without downloading them.

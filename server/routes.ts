@@ -168,6 +168,145 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Profile routes
+  app.get("/api/profile", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Get user stats
+      const stats = await storage.getUserStats(req.session.userId!);
+
+      res.json({
+        user: {
+          id: user.id,
+          username: user.username,
+          name: user.name,
+          role: user.role,
+          class: user.class,
+          phone: user.phone,
+          location: user.location,
+          bio: user.bio,
+          department: user.department,
+          year: user.year,
+          rollNumber: user.rollNumber,
+          createdAt: user.createdAt,
+        },
+        stats,
+      });
+    } catch (error) {
+      console.error("Get profile error:", error);
+      res.status(500).json({ message: "Failed to get profile" });
+    }
+  });
+
+  app.put("/api/profile", requireAuth, async (req, res) => {
+    try {
+      const { name, phone, location, bio, department, year, rollNumber } =
+        req.body;
+
+      const updatedUser = await storage.updateProfile(req.session.userId!, {
+        name,
+        phone,
+        location,
+        bio,
+        department,
+        year,
+        rollNumber,
+      });
+
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json({
+        message: "Profile updated successfully",
+        user: {
+          id: updatedUser.id,
+          username: updatedUser.username,
+          name: updatedUser.name,
+          role: updatedUser.role,
+          class: updatedUser.class,
+          phone: updatedUser.phone,
+          location: updatedUser.location,
+          bio: updatedUser.bio,
+          department: updatedUser.department,
+          year: updatedUser.year,
+          rollNumber: updatedUser.rollNumber,
+        },
+      });
+    } catch (error) {
+      console.error("Update profile error:", error);
+      res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
+  // Preferences routes
+  app.get("/api/preferences", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json({
+        preferences: user.preferences || {
+          notifications: {
+            assignments: true,
+            presentations: true,
+            announcements: true,
+            reminders: true,
+            emailDigest: false,
+            pushNotifications: true,
+            soundEnabled: true,
+          },
+          display: {
+            compactMode: false,
+            showPreviewCards: true,
+            animationsEnabled: true,
+            highContrast: false,
+          },
+          privacy: {
+            profileVisibility: "public",
+            showOnlineStatus: true,
+            allowDirectMessages: true,
+            dataCollection: true,
+          },
+          language: "en",
+          timezone: "UTC",
+        },
+      });
+    } catch (error) {
+      console.error("Get preferences error:", error);
+      res.status(500).json({ message: "Failed to get preferences" });
+    }
+  });
+
+  app.put("/api/preferences", requireAuth, async (req, res) => {
+    try {
+      const { preferences } = req.body;
+
+      const updatedUser = await storage.updatePreferences(
+        req.session.userId!,
+        preferences
+      );
+
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json({
+        message: "Preferences updated successfully",
+        preferences: updatedUser.preferences,
+      });
+    } catch (error) {
+      console.error("Update preferences error:", error);
+      res.status(500).json({ message: "Failed to update preferences" });
+    }
+  });
+
   // Updates routes
   app.get("/api/updates", requireAuth, async (req, res) => {
     try {
@@ -692,6 +831,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Simple Gemini v1 test endpoint (no auth required for debugging)
+  app.get("/api/test/gemini-v1", async (req, res) => {
+    try {
+      console.log("[gemini-v1-test] Testing Gemini v1 API");
+
+      const result = await aiManager.useGemini(
+        "gemini-2.5-flash",
+        "Say hello in one word"
+      );
+
+      if (result.success) {
+        console.log(
+          `[gemini-v1-test] ✅ SUCCESS: Using v1 API with provider: ${result.provider}`
+        );
+        res.json({
+          success: true,
+          message: "Gemini v1 API is working correctly!",
+          provider: result.provider,
+          model: result.model,
+          response: result.data,
+          timestamp: new Date().toISOString(),
+          apiVersion: "v1",
+        });
+      } else {
+        console.log(`[gemini-v1-test] ❌ FAILED: ${result.error}`);
+        res.status(500).json({
+          success: false,
+          message: "Gemini v1 API test failed",
+          error: result.error,
+          provider: result.provider,
+        });
+      }
+    } catch (error) {
+      console.error("[gemini-v1-test] Error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Gemini v1 API test error",
+        error: String(error),
+      });
+    }
+  });
+
   // File routes
   app.get("/api/files/:filename", requireAuth, async (req, res) => {
     try {
@@ -943,6 +1124,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update enhancement endpoint
+  app.post("/api/updates/:id/enhance", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    try {
+      const { id } = req.params;
+      const update = await storage.getUpdate(id);
+
+      if (!update) {
+        return res.status(404).json({ message: "Update not found" });
+      }
+
+      // Use the existing description or content as base
+      const baseContent = update.description || update.content;
+
+      // Create an enhanced prompt for better formatting
+      const enhancementPrompt = `
+Please enhance and reformat the following text to be more detailed, professional, and well-formatted. 
+Add bullet points for lists, proper headings, and more context where needed.
+Make it comprehensive and easy to read while maintaining all the original information.
+Focus on clarity, proper formatting, and adding helpful details.
+
+Original text:
+${baseContent}
+
+Please provide a well-formatted, enhanced version with:
+- Clear headings and subheadings
+- Bullet points for lists
+- Proper formatting
+- Additional helpful context
+- Professional tone
+- Better organization
+`;
+
+      // Try to get enhanced description using AI
+      const result = await aiManager.generateWithFallback(
+        enhancementPrompt,
+        "gemini"
+      );
+
+      let enhancedDescription = baseContent; // fallback to original
+
+      if (result.success && result.data) {
+        enhancedDescription = result.data.trim();
+        // Clean up any markdown formatting markers that shouldn't be there
+        enhancedDescription = enhancedDescription
+          .replace(/^```.*\n|```$/gm, "")
+          .trim();
+      }
+
+      res.json({
+        enhancedDescription,
+        original: baseContent,
+      });
+    } catch (error) {
+      console.error("Enhancement error:", error);
+      res.status(500).json({
+        message: "Failed to enhance description",
+        error: String(error),
+      });
+    }
+  });
+
   // Performance tracking routes
   app.use("/api/performance", performanceRoutes);
 
@@ -954,6 +1200,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Bulk user management routes
   app.use("/api/bulk-users", bulkUsersRoutes);
+
+  // OCR test page route
+  app.get("/test-ocr", (req, res) => {
+    const htmlPath = path.join(process.cwd(), "test-enhanced-ocr.html");
+    if (fs.existsSync(htmlPath)) {
+      res.sendFile(htmlPath);
+    } else {
+      res.status(404).send("OCR test page not found");
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;

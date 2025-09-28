@@ -9,6 +9,39 @@ export interface IUserDocument extends Document {
   name: string;
   class: string;
   createdAt: Date;
+  // Extended profile fields
+  phone?: string;
+  location?: string;
+  bio?: string;
+  department?: string;
+  year?: string;
+  rollNumber?: string;
+  // Preferences
+  preferences?: {
+    notifications?: {
+      assignments?: boolean;
+      presentations?: boolean;
+      announcements?: boolean;
+      reminders?: boolean;
+      emailDigest?: boolean;
+      pushNotifications?: boolean;
+      soundEnabled?: boolean;
+    };
+    display?: {
+      compactMode?: boolean;
+      showPreviewCards?: boolean;
+      animationsEnabled?: boolean;
+      highContrast?: boolean;
+    };
+    privacy?: {
+      profileVisibility?: "public" | "classmates" | "private";
+      showOnlineStatus?: boolean;
+      allowDirectMessages?: boolean;
+      dataCollection?: boolean;
+    };
+    language?: string;
+    timezone?: string;
+  };
 }
 
 const UserSchema = new Schema<IUserDocument>({
@@ -19,6 +52,43 @@ const UserSchema = new Schema<IUserDocument>({
   name: { type: String, required: true },
   class: { type: String, required: true },
   createdAt: { type: Date, default: Date.now },
+  // Extended profile fields
+  phone: { type: String },
+  location: { type: String },
+  bio: { type: String },
+  department: { type: String },
+  year: { type: String },
+  rollNumber: { type: String },
+  // Preferences
+  preferences: {
+    notifications: {
+      assignments: { type: Boolean, default: true },
+      presentations: { type: Boolean, default: true },
+      announcements: { type: Boolean, default: true },
+      reminders: { type: Boolean, default: true },
+      emailDigest: { type: Boolean, default: false },
+      pushNotifications: { type: Boolean, default: true },
+      soundEnabled: { type: Boolean, default: true },
+    },
+    display: {
+      compactMode: { type: Boolean, default: false },
+      showPreviewCards: { type: Boolean, default: true },
+      animationsEnabled: { type: Boolean, default: true },
+      highContrast: { type: Boolean, default: false },
+    },
+    privacy: {
+      profileVisibility: {
+        type: String,
+        enum: ["public", "classmates", "private"],
+        default: "public",
+      },
+      showOnlineStatus: { type: Boolean, default: true },
+      allowDirectMessages: { type: Boolean, default: true },
+      dataCollection: { type: Boolean, default: true },
+    },
+    language: { type: String, default: "en" },
+    timezone: { type: String, default: "UTC" },
+  },
 });
 
 // Update Model
@@ -175,18 +245,68 @@ const DailyAttendanceSchema = new Schema<IDailyAttendanceDocument>(
   {
     _id: { type: String, required: true },
     date: { type: Date, required: true },
-    classSection: { type: String, required: true, default: "E1" },
+    classSection: {
+      type: String,
+      required: true,
+      default: "E1",
+      enum: ["E1", "E2", "E3", "E4"], // Valid class sections
+    },
     markedBy: { type: String, required: true },
     students: [
       {
-        studentId: { type: String, required: true },
+        studentId: {
+          type: String,
+          required: true,
+          validate: {
+            validator: function (v: string) {
+              // Validate that studentId is a reasonable length (student IDs can be numeric)
+              return typeof v === "string" && v.length >= 5 && v.length <= 50;
+            },
+            message:
+              "Student ID must be a valid identifier between 5-50 characters",
+          },
+        },
         subjects: [
           {
-            subjectName: { type: String, required: true },
+            subjectName: {
+              type: String,
+              required: true,
+              enum: [
+                "Computer Graphics",
+                "CG",
+                "CG Lab 4",
+                "Operating Systems",
+                "OS",
+                "Cloud Computing",
+                "CC",
+                "Machine Learning",
+                "ML",
+                "ML Lab 4",
+                "Linux Lab 4",
+              ], // Valid subject names from timetable
+              validate: {
+                validator: function (v: string) {
+                  // Ensure subject name is not just a number
+                  return (
+                    typeof v === "string" && !/^\d+$/.test(v) && v.length > 1
+                  );
+                },
+                message:
+                  "Subject name must be a valid subject identifier, not just numbers",
+              },
+            },
             status: {
               type: String,
               enum: ["present", "absent"],
               required: true,
+              validate: {
+                validator: function (v: string) {
+                  // Ensure status is not a single character like 'p'
+                  return v === "present" || v === "absent";
+                },
+                message:
+                  'Status must be either "present" or "absent", not abbreviated forms',
+              },
             },
             timestamp: { type: Date, default: Date.now },
           },

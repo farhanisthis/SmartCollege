@@ -21,6 +21,14 @@ export const users = pgTable("users", {
   name: text("name").notNull(),
   class: text("class").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
+  // Extended profile fields
+  phone: text("phone"),
+  location: text("location"),
+  bio: text("bio"),
+  department: text("department"),
+  year: text("year"),
+  rollNumber: text("roll_number"),
+  preferences: jsonb("preferences"),
 });
 
 export const updates = pgTable("updates", {

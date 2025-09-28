@@ -3,6 +3,8 @@ import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Calendar } from "../ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { AttendanceSheetUploader } from "./attendance-sheet-uploader";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import {
   CalendarIcon,
   Users,
@@ -10,6 +12,8 @@ import {
   RotateCcw,
   Search,
   Download,
+  Upload,
+  Zap,
 } from "lucide-react";
 import { Input } from "../ui/input";
 import { format } from "date-fns";
@@ -119,6 +123,12 @@ const E1Students = [
     name: "Shiven Sharma",
     email: "shivensharma@example.com",
     enrollment: "00224402023",
+  },
+  {
+    id: "00324402023",
+    name: "Shivam Vij",
+    email: "shivamvij@example.com",
+    enrollment: "00324402023",
   },
   {
     id: "00424402023",
@@ -734,6 +744,16 @@ export default function AttendanceManager() {
 
   const stats = getAttendanceStats();
 
+  // Handle upload completion callback
+  const handleUploadComplete = (result: any) => {
+    if (result.success && result.data) {
+      // Refresh attendance data after upload
+      const uploadDate = new Date(result.data.date);
+      setSelectedDate(uploadDate);
+      // Reload attendance data will be triggered by useEffect when selectedDate changes
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -807,219 +827,243 @@ export default function AttendanceManager() {
         </div>
       </div>
 
-      {/* Statistics */}
-      <div className="grid grid-cols-5 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-blue-600">
-              {E1Students.length}
-            </div>
-            <div className="text-sm text-gray-600">Total Students</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-green-600">
-              {subjectsForDay.length}
-            </div>
-            <div className="text-sm text-gray-600">Subjects Today</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-purple-600">
-              {stats.percentageComplete.toFixed(1)}%
-            </div>
-            <div className="text-sm text-gray-600">Completed</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-orange-600">
-              {stats.attendanceRate.toFixed(1)}%
-            </div>
-            <div className="text-sm text-gray-600">Present Rate</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-red-600">
-              {stats.totalMarked}
-            </div>
-            <div className="text-sm text-gray-600">Marked Entries</div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Main Content with Tabs */}
+      <Tabs defaultValue="manual" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <TabsTrigger value="manual" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Manual Entry
+          </TabsTrigger>
+          <TabsTrigger value="ai-upload" className="flex items-center gap-2">
+            <Zap className="h-4 w-4" />
+            AI Upload
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Search Bar */}
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-          <Input
-            placeholder="Search students by name or enrollment..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <div className="text-sm text-gray-600">
-          Showing {filteredStudents.length} of {E1Students.length} students
-        </div>
-      </div>
+        {/* Manual Attendance Entry Tab */}
+        <TabsContent value="manual" className="space-y-6">
+          {/* Statistics */}
+          <div className="grid grid-cols-5 gap-4">
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-2xl font-bold text-blue-600">
+                  {E1Students.length}
+                </div>
+                <div className="text-sm text-gray-600">Total Students</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-2xl font-bold text-green-600">
+                  {subjectsForDay.length}
+                </div>
+                <div className="text-sm text-gray-600">Subjects Today</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-2xl font-bold text-purple-600">
+                  {stats.percentageComplete.toFixed(1)}%
+                </div>
+                <div className="text-sm text-gray-600">Completed</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-2xl font-bold text-orange-600">
+                  {stats.attendanceRate.toFixed(1)}%
+                </div>
+                <div className="text-sm text-gray-600">Present Rate</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-2xl font-bold text-red-600">
+                  {stats.totalMarked}
+                </div>
+                <div className="text-sm text-gray-600">Marked Entries</div>
+              </CardContent>
+            </Card>
+          </div>
 
-      {/* No subjects message */}
-      {subjectsForDay.length === 0 && (
-        <Card>
-          <CardContent className="p-8 text-center">
-            <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-600 mb-2">
-              No Classes Scheduled
-            </h3>
-            <p className="text-gray-500">
-              There are no classes scheduled for {dayName}.
-            </p>
-          </CardContent>
-        </Card>
-      )}
+          {/* Search Bar */}
+          <div className="flex items-center gap-4">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Search students by name or enrollment..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="text-sm text-gray-600">
+              Showing {filteredStudents.length} of {E1Students.length} students
+            </div>
+          </div>
 
-      {/* Loading state */}
-      {isLoading && (
-        <Card>
-          <CardContent className="p-8 text-center">
-            <div className="animate-pulse">Loading attendance data...</div>
-          </CardContent>
-        </Card>
-      )}
+          {/* No subjects message */}
+          {subjectsForDay.length === 0 && (
+            <Card>
+              <CardContent className="p-8 text-center">
+                <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-600 mb-2">
+                  No Classes Scheduled
+                </h3>
+                <p className="text-gray-500">
+                  There are no classes scheduled for {dayName}.
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
-      {/* Attendance Grid */}
-      {subjectsForDay.length > 0 && !isLoading && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Attendance Sheet - {dayName} ({filteredStudents.length} students)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="border-b-2 border-gray-200">
-                    <th className="text-left p-4 font-semibold text-gray-700 bg-gray-50 sticky left-0 z-10">
-                      Student Details
-                    </th>
-                    {subjectsForDay.map(({ time, subject, bg }) => (
-                      <th
-                        key={`${time}-${subject}`}
-                        className="text-center p-4 font-semibold text-white relative min-w-[120px]"
-                      >
-                        <div
-                          className={`absolute inset-0 bg-gradient-to-br ${bg} rounded-t-lg`}
-                        />
-                        <div className="relative z-10">
-                          <div className="text-sm font-bold">{subject}</div>
-                          <div className="text-xs opacity-90 whitespace-pre-line">
-                            {time}
-                          </div>
-                          <div className="flex gap-1 justify-center mt-2">
-                            <button
-                              onClick={() => markAllPresent(subject)}
-                              className="px-2 py-1 text-xs bg-white/20 hover:bg-white/30 rounded text-white transition-colors"
-                              title="Mark all present"
-                            >
-                              All ✓
-                            </button>
-                            <button
-                              onClick={() => markAllAbsent(subject)}
-                              className="px-2 py-1 text-xs bg-white/20 hover:bg-white/30 rounded text-white transition-colors"
-                              title="Mark all absent"
-                            >
-                              All ✗
-                            </button>
-                          </div>
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredStudents.map((student, index) => (
-                    <tr
-                      key={student.id}
-                      className={`border-b ${
-                        index % 2 === 0 ? "bg-white" : "bg-gray-50"
-                      } hover:bg-blue-50 transition-colors`}
-                    >
-                      <td className="p-4 sticky left-0 bg-inherit z-10">
-                        <div>
-                          <div className="font-semibold text-gray-900">
-                            {student.name}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {student.enrollment}
-                          </div>
-                          <div className="text-xs text-gray-400 truncate">
-                            {student.email}
-                          </div>
-                        </div>
-                      </td>
-                      {subjectsForDay.map(({ subject }) => (
-                        <td
-                          key={`${student.id}-${subject}`}
-                          className="p-4 text-center"
-                        >
-                          <button
-                            onClick={() =>
-                              toggleAttendance(student.id, subject)
-                            }
-                            className={`w-12 h-12 rounded-full border-2 font-bold text-lg transition-all duration-200 transform hover:scale-110 ${getAttendanceButtonStyle(
-                              attendance[student.id]?.[subject]
-                            )}`}
-                            title={`Click to mark ${student.name} as ${
-                              attendance[student.id]?.[subject] === undefined
-                                ? "present"
-                                : attendance[student.id]?.[subject] ===
-                                  "present"
-                                ? "absent"
-                                : "unmarked"
-                            }`}
+          {/* Loading state */}
+          {isLoading && (
+            <Card>
+              <CardContent className="p-8 text-center">
+                <div className="animate-pulse">Loading attendance data...</div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Attendance Grid */}
+          {subjectsForDay.length > 0 && !isLoading && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Attendance Sheet - {dayName} ({filteredStudents.length}{" "}
+                  students)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="border-b-2 border-gray-200">
+                        <th className="text-left p-4 font-semibold text-gray-700 bg-gray-50 sticky left-0 z-10">
+                          Student Details
+                        </th>
+                        {subjectsForDay.map(({ time, subject, bg }) => (
+                          <th
+                            key={`${time}-${subject}`}
+                            className="text-center p-4 font-semibold text-white relative min-w-[120px]"
                           >
-                            {getAttendanceText(
-                              attendance[student.id]?.[subject]
-                            )}
-                          </button>
-                        </td>
+                            <div
+                              className={`absolute inset-0 bg-gradient-to-br ${bg} rounded-t-lg`}
+                            />
+                            <div className="relative z-10">
+                              <div className="text-sm font-bold">{subject}</div>
+                              <div className="text-xs opacity-90 whitespace-pre-line">
+                                {time}
+                              </div>
+                              <div className="flex gap-1 justify-center mt-2">
+                                <button
+                                  onClick={() => markAllPresent(subject)}
+                                  className="px-2 py-1 text-xs bg-white/20 hover:bg-white/30 rounded text-white transition-colors"
+                                  title="Mark all present"
+                                >
+                                  All ✓
+                                </button>
+                                <button
+                                  onClick={() => markAllAbsent(subject)}
+                                  className="px-2 py-1 text-xs bg-white/20 hover:bg-white/30 rounded text-white transition-colors"
+                                  title="Mark all absent"
+                                >
+                                  All ✗
+                                </button>
+                              </div>
+                            </div>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredStudents.map((student, index) => (
+                        <tr
+                          key={student.id}
+                          className={`border-b ${
+                            index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                          } hover:bg-blue-50 transition-colors`}
+                        >
+                          <td className="p-4 sticky left-0 bg-inherit z-10">
+                            <div>
+                              <div className="font-semibold text-gray-900">
+                                {student.name}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                {student.enrollment}
+                              </div>
+                              <div className="text-xs text-gray-400 truncate">
+                                {student.email}
+                              </div>
+                            </div>
+                          </td>
+                          {subjectsForDay.map(({ subject }) => (
+                            <td
+                              key={`${student.id}-${subject}`}
+                              className="p-4 text-center"
+                            >
+                              <button
+                                onClick={() =>
+                                  toggleAttendance(student.id, subject)
+                                }
+                                className={`w-12 h-12 rounded-full border-2 font-bold text-lg transition-all duration-200 transform hover:scale-110 ${getAttendanceButtonStyle(
+                                  attendance[student.id]?.[subject]
+                                )}`}
+                                title={`Click to mark ${student.name} as ${
+                                  attendance[student.id]?.[subject] ===
+                                  undefined
+                                    ? "present"
+                                    : attendance[student.id]?.[subject] ===
+                                      "present"
+                                    ? "absent"
+                                    : "unmarked"
+                                }`}
+                              >
+                                {getAttendanceText(
+                                  attendance[student.id]?.[subject]
+                                )}
+                              </button>
+                            </td>
+                          ))}
+                        </tr>
                       ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                    </tbody>
+                  </table>
+                </div>
 
-            {/* Legend */}
-            <div className="mt-6 flex items-center justify-center gap-6 p-4 bg-gray-50 rounded-lg">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white text-sm font-bold">
-                  ✓
+                {/* Legend */}
+                <div className="mt-6 flex items-center justify-center gap-6 p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white text-sm font-bold">
+                      ✓
+                    </div>
+                    <span className="text-sm text-gray-600">Present</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center text-white text-sm font-bold">
+                      ✗
+                    </div>
+                    <span className="text-sm text-gray-600">Absent</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-sm font-bold">
+                      ○
+                    </div>
+                    <span className="text-sm text-gray-600">Not Marked</span>
+                  </div>
                 </div>
-                <span className="text-sm text-gray-600">Present</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center text-white text-sm font-bold">
-                  ✗
-                </div>
-                <span className="text-sm text-gray-600">Absent</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-sm font-bold">
-                  ○
-                </div>
-                <span className="text-sm text-gray-600">Not Marked</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* AI Upload Tab */}
+        <TabsContent value="ai-upload">
+          <AttendanceSheetUploader onUploadComplete={handleUploadComplete} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

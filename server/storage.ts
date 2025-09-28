@@ -16,6 +16,27 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateProfile(
+    userId: string,
+    profileData: {
+      name?: string;
+      phone?: string;
+      location?: string;
+      bio?: string;
+      department?: string;
+      year?: string;
+      rollNumber?: string;
+    }
+  ): Promise<User | undefined>;
+  updatePreferences(
+    userId: string,
+    preferences: any
+  ): Promise<User | undefined>;
+  getUserStats(userId: string): Promise<{
+    assignmentsCompleted: number;
+    presentationsDelivered: number;
+    attendancePercentage: number;
+  }>;
 
   // Update methods
   getUpdates(filters?: {
@@ -79,6 +100,13 @@ export class MemStorage implements IStorage {
       name: "Farhan Ali",
       class: "Computer Science - Semester 5",
       createdAt: new Date(),
+      phone: null,
+      location: null,
+      bio: null,
+      department: null,
+      year: null,
+      rollNumber: null,
+      preferences: null,
     };
     this.users.set(crUser.id, crUser);
 
@@ -91,6 +119,13 @@ export class MemStorage implements IStorage {
       name: "Kashish",
       class: "Computer Science - Semester 5",
       createdAt: new Date(),
+      phone: null,
+      location: null,
+      bio: null,
+      department: null,
+      year: null,
+      rollNumber: null,
+      preferences: null,
     };
     this.users.set(kashishUser.id, kashishUser);
 
@@ -103,6 +138,13 @@ export class MemStorage implements IStorage {
       name: "Rohit",
       class: "Computer Science - Semester 5",
       createdAt: new Date(),
+      phone: null,
+      location: null,
+      bio: null,
+      department: null,
+      year: null,
+      rollNumber: null,
+      preferences: null,
     };
     this.users.set(studentUser.id, studentUser);
   }
@@ -124,6 +166,13 @@ export class MemStorage implements IStorage {
       role: insertUser.role || "student", // Ensure role has default value
       id,
       createdAt: new Date(),
+      phone: insertUser.phone || null,
+      location: insertUser.location || null,
+      bio: insertUser.bio || null,
+      department: insertUser.department || null,
+      year: insertUser.year || null,
+      rollNumber: insertUser.rollNumber || null,
+      preferences: insertUser.preferences || null,
     };
     this.users.set(id, user);
     return user;
@@ -341,6 +390,43 @@ export class MemStorage implements IStorage {
   async hasUserViewed(userId: string, updateId: string): Promise<boolean> {
     const id = `${userId}-${updateId}`;
     return this.userViews.has(id);
+  }
+
+  async updateProfile(
+    userId: string,
+    profileData: {
+      name?: string;
+      phone?: string;
+      location?: string;
+      bio?: string;
+      department?: string;
+      year?: string;
+      rollNumber?: string;
+    }
+  ): Promise<User | undefined> {
+    // Stub implementation - not used since we use MongoStorage
+    return undefined;
+  }
+
+  async updatePreferences(
+    userId: string,
+    preferences: any
+  ): Promise<User | undefined> {
+    // Stub implementation - not used since we use MongoStorage
+    return undefined;
+  }
+
+  async getUserStats(userId: string): Promise<{
+    assignmentsCompleted: number;
+    presentationsDelivered: number;
+    attendancePercentage: number;
+  }> {
+    // Stub implementation - not used since we use MongoStorage
+    return {
+      assignmentsCompleted: 0,
+      presentationsDelivered: 0,
+      attendancePercentage: 0,
+    };
   }
 }
 

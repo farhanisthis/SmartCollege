@@ -1,4 +1,4 @@
-import { Bell, GraduationCap, ChevronDown, Wifi, WifiOff } from "lucide-react";
+import { GraduationCap, ChevronDown, Wifi, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -18,7 +18,7 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useWebSocket } from "@/contexts/WebSocketContext";
-import NotificationBell from "@/components/notifications/notification-bell";
+import { useLocation } from "wouter";
 
 interface HeaderProps {
   onCreateUpdate?: () => void;
@@ -28,9 +28,18 @@ export default function Header({ onCreateUpdate }: HeaderProps) {
   const { user, logout } = useAuth();
   const isMobile = useIsMobile();
   const { connected } = useWebSocket();
+  const [, setLocation] = useLocation();
 
   const handleLogout = async () => {
     await logout();
+  };
+
+  const navigateToProfile = () => {
+    setLocation("/profile");
+  };
+
+  const navigateToPreferences = () => {
+    setLocation("/preferences");
   };
 
   return (
@@ -98,9 +107,6 @@ export default function Header({ onCreateUpdate }: HeaderProps) {
             {/* Theme Toggle - hidden on mobile to save space */}
             {!isMobile && <ThemeToggle />}
 
-            {/* Notifications */}
-            <NotificationBell data-testid="notification-bell" />
-
             {/* User Menu */}
             {user && (
               <DropdownMenu>
@@ -140,10 +146,16 @@ export default function Header({ onCreateUpdate }: HeaderProps) {
                       <DropdownMenuSeparator />
                     </>
                   )}
-                  <DropdownMenuItem data-testid="menu-profile">
+                  <DropdownMenuItem
+                    onClick={navigateToProfile}
+                    data-testid="menu-profile"
+                  >
                     <span>Profile Settings</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem data-testid="menu-preferences">
+                  <DropdownMenuItem
+                    onClick={navigateToPreferences}
+                    data-testid="menu-preferences"
+                  >
                     <span>Preferences</span>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />

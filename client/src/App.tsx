@@ -8,6 +8,8 @@ import { ThemeProvider } from "@/hooks/use-theme";
 import { WebSocketProvider } from "@/contexts/WebSocketContext";
 import Dashboard from "@/pages/dashboard";
 import Login from "@/pages/login";
+import Profile from "@/pages/profile";
+import Preferences from "@/pages/preferences";
 import ProtectedRoute from "@/components/auth/protected-route";
 import NotFound from "@/pages/not-found";
 
@@ -15,6 +17,16 @@ function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
+      <Route path="/profile">
+        <ProtectedRoute>
+          <Profile />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/preferences">
+        <ProtectedRoute>
+          <Preferences />
+        </ProtectedRoute>
+      </Route>
       <Route path="/">
         <ProtectedRoute>
           <Dashboard />
