@@ -42,13 +42,13 @@ export default function CreateUpdateModal({
   const createMutation = useMutation({
     mutationFn: async (data: { contextText: string; files: File[] }) => {
       const formData = new FormData();
-      formData.append("contextText", data.contextText);
+      formData.append("contextText", data.contextText); // Unified endpoint expects "contextText"
 
       data.files.forEach((file) => {
         formData.append("files", file);
       });
 
-      const response = await fetch(getApiUrl("/api/updates"), {
+      const response = await fetch(getApiUrl("/api/updates/unified"), {
         method: "POST",
         body: formData,
         credentials: "include",

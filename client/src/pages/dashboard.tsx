@@ -9,6 +9,7 @@ import MobileBottomNav from "@/components/layout/mobile-bottom-nav";
 import MobileCreateFab from "@/components/layout/mobile-create-fab";
 import UpdateCard from "@/components/updates/update-card";
 import PerformanceDashboard from "./performance-dashboard";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 import {
   Accordion,
   AccordionItem,
@@ -326,6 +327,7 @@ export default function Dashboard() {
   const isCR = user?.role === "cr";
 
   return (
+    <ErrorBoundary>
     <div
       className="min-h-screen bg-background relative"
       onDragEnter={handleDragEnter}
@@ -683,5 +685,6 @@ export default function Dashboard() {
         />
       )}
     </div>
+    </ErrorBoundary>
   );
 }
