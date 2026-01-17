@@ -85,6 +85,9 @@ const requireCR = (req: any, res: any, next: any) => {
 
 // All route and middleware definitions go here
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Enable trust proxy for Render (required for secure cookies)
+  app.set("trust proxy", 1);
+
   // Session middleware setup (must be before all routes)
   app.use(
     session({
@@ -93,7 +96,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       saveUninitialized: false,
       cookie: {
         httpOnly: true,
-        secure: false, // set to true if using HTTPS
+        secure: process.env.NODE_ENV === "production", // true in production
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // none for cross-site
         maxAge: 1000 * 60 * 60 * 24, // 1 day
       },
     })
