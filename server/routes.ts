@@ -24,6 +24,7 @@ import performanceRoutes from "./routes/performance";
 import notificationRoutes from "./routes/notifications";
 import attendanceRoutes from "./routes/attendance";
 import bulkUsersRoutes from "./routes/bulk-users";
+import { generatePerformanceInsight, summarizeText } from "./services/gemini";
 
 // File upload error handler
 const handleUploadError = (
@@ -129,6 +130,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: user.name,
           role: user.role,
           class: user.class,
+          rollNumber: user.rollNumber, // Include rollNumber for attendance matching
         },
       });
     } catch (error) {
@@ -160,6 +162,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: user.name,
           role: user.role,
           class: user.class,
+          rollNumber: user.rollNumber, // Include rollNumber for attendance matching
         },
       });
     } catch (error) {
@@ -310,12 +313,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Updates routes
   app.get("/api/updates", requireAuth, async (req, res) => {
     try {
-      const { category, limit, offset } = req.query;
+      const { category, limit, offset, search } = req.query;
 
       const updates = await storage.getUpdates({
         category: category as string,
         limit: limit ? parseInt(limit as string) : undefined,
         offset: offset ? parseInt(offset as string) : undefined,
+        search: search as string,
       });
 
       // Mark view status for current user
@@ -342,9 +346,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Update not found" });
       }
 
-      // Increment view count and mark as viewed
-      await storage.incrementViewCount(id);
-      await storage.markAsViewed(req.session.userId!, id);
+      // Check if user has already viewed this update
+      const hasViewed = await storage.hasUserViewed(req.session.userId!, id);
+
+      // Only increment view count if this is the user's first view
+      if (!hasViewed) {
+        await storage.incrementViewCount(id);
+        await storage.markAsViewed(req.session.userId!, id);
+      }
 
       update.hasViewed = true;
       res.json(update);
@@ -781,6 +790,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
   );
+
+  // --- New AI Features ---
+  app.post("/api/ai/performance-insight", async (req, res) => {
+    if (!req.session.userId) return res.status(401).send("Unauthorized");
+    try {
+      console.log("[API] Generating performance insight...");
+      const insight = await generatePerformanceInsight(req.body);
+      console.log("[API] Insight generated:", insight.slice(0, 50) + "...");
+      res.json({ insight });
+    } catch (e: any) {
+      console.error("[API] Gemini Error:", e);
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.post("/api/ai/summarize", async (req, res) => {
+    if (!req.session.userId) return res.status(401).send("Unauthorized");
+    try {
+      const { text } = req.body;
+      if (!text) return res.status(400).send("Text is required");
+      
+      const summary = await summarizeText(text);
+      res.json({ summary });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
 
   // AI Test route
   app.post("/api/ai/test", requireCR, async (req, res) => {
@@ -1226,6 +1262,11 @@ Please provide a well-formatted, enhanced version with:
     } else {
       res.status(404).send("OCR test page not found");
     }
+  });
+
+  // Health Check
+  app.get("/api/health", (_req, res) => {
+    res.json({ status: "ok", ip: _req.ip });
   });
 
   const httpServer = createServer(app);

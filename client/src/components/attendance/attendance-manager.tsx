@@ -16,7 +16,14 @@ import {
   Zap,
 } from "lucide-react";
 import { Input } from "../ui/input";
-import { format } from "date-fns";
+
+import { format, addDays } from "date-fns";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { MobileAttendanceCard } from "./mobile-attendance-card";
+import { MobileAttendanceHeader } from "./mobile-attendance-header";
+import { MobileStudentRow } from "./mobile-student-row";
+import { cn } from "@/lib/utils";
+import * as XLSX from "xlsx";
 
 // E1 Timetable Data
 const E1Schedule = {
@@ -486,6 +493,7 @@ export default function AttendanceManager() {
   const [isSaving, setIsSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const isMobile = useIsMobile();
 
   const dayName = format(selectedDate, "EEEE"); // Monday, Tuesday, etc.
   const subjectsForDay = useMemo(() => getSubjectsForDay(dayName), [dayName]);
@@ -754,33 +762,211 @@ export default function AttendanceManager() {
     }
   };
 
+  // Helpers for Mobile View
+  const [currentSubjectIndex, setCurrentSubjectIndex] = useState(0);
+  const [activeTab, setActiveTab] = useState<"attendance" | "timetable" | "assignments">("attendance");
+  const currentActiveSubject = subjectsForDay[currentSubjectIndex];
+
+  const prevDay = () => setSelectedDate((date) => addDays(date, -1));
+  const nextDay = () => setSelectedDate((date) => addDays(date, 1));
+
+  const handleNextSubject = () => {
+    if (currentSubjectIndex < subjectsForDay.length - 1) {
+      setCurrentSubjectIndex(prev => prev + 1);
+    }
+  };
+
+  const handlePrevSubject = () => {
+    if (currentSubjectIndex > 0) {
+      setCurrentSubjectIndex(prev => prev - 1);
+    }
+  };
+  
+  const handleMobileMarkPresent = (studentId: string) => {
+    if (!currentActiveSubject) return;
+    setAttendance(prev => ({
+        ...prev,
+        [studentId]: {
+            ...prev[studentId],
+            [currentActiveSubject.subject]: "present"
+        }
+    }));
+  };
+
+  const handleMobileMarkAbsent = (studentId: string) => {
+    if (!currentActiveSubject) return;
+    setAttendance(prev => ({
+        ...prev,
+        [studentId]: {
+            ...prev[studentId],
+            [currentActiveSubject.subject]: "absent"
+        }
+    }));
+  };
+
+  const handleExport = () => {
+    // Flatten data for export
+    const exportData = E1Students.map(student => {
+      const studentAttendance = attendance[student.id] || {};
+      const row: any = {
+        "Student Name": student.name,
+        "Enrollment": student.enrollment,
+      };
+      
+      // Add columns for each subject
+      subjectsForDay.forEach(sub => {
+        row[sub.subject] = studentAttendance[sub.subject] || "Unmarked";
+      });
+      
+      return row;
+    });
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Attendance");
+    XLSX.writeFile(wb, `Attendance_${format(selectedDate, "yyyy-MM-dd")}.xlsx`);
+  };
+
+  if (isMobile) {
+    return (
+      <div className="min-h-screen bg-white pb-32">
+        <div className="px-4 pt-6 space-y-6">
+          <MobileAttendanceHeader
+            dayName={dayName}
+            selectedDate={selectedDate}
+            stats={stats}
+            totalStudents={E1Students.length}
+            currentSubject={currentActiveSubject}
+            onMarkAllPresent={() => currentActiveSubject && markAllPresent(currentActiveSubject.subject)}
+            onMarkAllAbsent={() => currentActiveSubject && markAllAbsent(currentActiveSubject.subject)}
+            onNextSubject={handleNextSubject}
+            onPrevSubject={handlePrevSubject}
+            hasNext={currentSubjectIndex < subjectsForDay.length - 1}
+            hasPrev={currentSubjectIndex > 0}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            onDateSelect={setSelectedDate}
+            onPrevDay={prevDay}
+            onNextDay={nextDay}
+          />
+
+
+          {activeTab === "attendance" && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              {/* Student List */}
+              <div className="space-y-0 divide-y divide-gray-50">
+                {filteredStudents.map((student) => {
+                  const status = currentActiveSubject 
+                    ? attendance[student.id]?.[currentActiveSubject.subject] 
+                    : undefined;
+                  
+                  return (
+                    <MobileStudentRow
+                      key={student.id}
+                      name={student.name}
+                      enrollment={student.enrollment}
+                      status={status}
+                      onMarkPresent={() => handleMobileMarkPresent(student.id)}
+                      onMarkAbsent={() => handleMobileMarkAbsent(student.id)}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {activeTab === "timetable" && (
+             <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+               <h3 className="font-bold text-lg text-gray-900 px-2">Today's Schedule</h3>
+               {subjectsForDay.map((subject, idx) => (
+                 <div key={idx} className="flex gap-4 p-4 bg-white border border-gray-100 rounded-2xl shadow-sm items-center">
+                    <div className={cn("h-16 w-16 rounded-xl bg-gradient-to-br flex items-center justify-center text-white font-bold text-xl shadow-lg", subject.bg && subject.bg.includes("from-") ? subject.bg : "bg-blue-500 from-blue-500 to-blue-600")}>
+                      {subject.subject.substring(0, 2)}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-gray-900 text-lg">{subject.subject}</h4>
+                      <p className="text-gray-500 font-medium">{subject.time.replace('\n—\n', ' - ')}</p>
+                    </div>
+                 </div>
+               ))}
+               {subjectsForDay.length === 0 && (
+                 <div className="text-center py-10 text-gray-400">
+                   No classes scheduled for today.
+                 </div>
+               )}
+             </div>
+          )}
+
+          {activeTab === "assignments" && (
+             <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="p-8 text-center bg-gray-50 rounded-3xl border border-dashed border-gray-200">
+                  <div className="h-16 w-16 bg-orange-100 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Zap className="h-8 w-8" />
+                  </div>
+                  <h3 className="font-bold text-gray-900 mb-2">No Active Assignments</h3>
+                  <p className="text-gray-500 text-sm">Great job! You're all caught up for {dayName}.</p>
+                </div>
+             </div>
+          )}
+        </div>
+
+        {/* Sticky Footer */}
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-xl border-t border-gray-100 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] z-50">
+           <div className="flex items-center gap-3">
+             <Button 
+                onClick={handleSaveAttendance}
+                disabled={isSaving}
+                className="flex-1 h-16 bg-[#ea580c] hover:bg-[#c2410c] text-white rounded-[1.5rem] shadow-xl shadow-orange-200 font-black text-lg flex items-center justify-center gap-2 active:scale-95 transition-all"
+             >
+               <Save className="h-6 w-6" />
+               {isSaving ? "Saving..." : "Save Attendance"}
+             </Button>
+             <Button 
+                variant="secondary" 
+                className="h-16 w-16 rounded-[1.5rem] bg-slate-100 hover:bg-slate-200 text-slate-500"
+                onClick={handleExport}
+             >
+               <Download className="h-6 w-6" />
+             </Button>
+           </div>
+           
+           {/* Visual Bottom Nav Indicator (as per mock) */}
+           <div className="flex justify-center mt-6 mb-2">
+             <div className="w-32 h-1.5 bg-slate-200 rounded-full" />
+           </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+
+      {/* Header Section - Mobile Optimized */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">
-            Attendance Management - E1 Section
+          <h2 className="text-2xl font-black text-gray-900 tracking-tight">
+            Attendance Management
           </h2>
-          <p className="text-gray-600">
-            Mark attendance for {dayName},{" "}
-            {format(selectedDate, "MMMM d, yyyy")}
-          </p>
+          <p className="text-gray-500 font-medium">E1 Section • {dayName}</p>
         </div>
 
-        <div className="flex items-center gap-4">
-          {/* Date Picker */}
+        <div className="flex flex-wrap items-center gap-2">
           <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
-                className="w-[240px] justify-start text-left font-normal"
+                className={cn(
+                  "justify-start text-left font-normal w-full md:w-[240px]", // Full width on mobile
+                  !selectedDate && "text-muted-foreground"
+                )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {format(selectedDate, "PPP")}
+                {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
+            <PopoverContent className="w-auto p-0" align="end">
               <Calendar
                 mode="single"
                 selected={selectedDate}
@@ -795,11 +981,10 @@ export default function AttendanceManager() {
             </PopoverContent>
           </Popover>
 
-          {/* Action Buttons */}
           <Button
             variant="outline"
             onClick={exportToCSV}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 flex-1 md:flex-none" // Flex-1 for equal width
             disabled={subjectsForDay.length === 0}
           >
             <Download className="h-4 w-4" />
@@ -809,7 +994,7 @@ export default function AttendanceManager() {
           <Button
             variant="outline"
             onClick={resetAttendance}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 flex-1 md:flex-none"
             disabled={isLoading}
           >
             <RotateCcw className="h-4 w-4" />
@@ -819,13 +1004,14 @@ export default function AttendanceManager() {
           <Button
             onClick={handleSaveAttendance}
             disabled={isSaving || isLoading || subjectsForDay.length === 0}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 flex-1 md:flex-none w-full md:w-auto" // Full width save button
           >
             <Save className="h-4 w-4" />
             {isSaving ? "Saving..." : "Save Attendance"}
           </Button>
         </div>
       </div>
+
 
       {/* Main Content with Tabs */}
       <Tabs defaultValue="manual" className="w-full">
@@ -843,7 +1029,7 @@ export default function AttendanceManager() {
         {/* Manual Attendance Entry Tab */}
         <TabsContent value="manual" className="space-y-6">
           {/* Statistics */}
-          <div className="grid grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <Card>
               <CardContent className="p-4">
                 <div className="text-2xl font-bold text-blue-600">
@@ -928,6 +1114,27 @@ export default function AttendanceManager() {
 
           {/* Attendance Grid */}
           {subjectsForDay.length > 0 && !isLoading && (
+            isMobile ?
+              <div className="space-y-4 pb-20">
+                <div className="flex items-center justify-between px-2 mb-2">
+                   <h3 className="font-bold text-gray-700">Student List ({filteredStudents.length})</h3>
+                   <span className="text-xs text-muted-foreground bg-gray-100 px-2 py-1 rounded">
+                      Swipe cards for subjects
+                   </span>
+                </div>
+                
+                {filteredStudents.map((student) => (
+                  <MobileAttendanceCard
+                    key={student.id}
+                    student={student}
+                    subjects={subjectsForDay}
+                    attendance={attendance[student.id] || {}}
+                    onToggleAttendance={toggleAttendance}
+                    getAttendanceButtonStyle={getAttendanceButtonStyle}
+                  />
+                ))}
+              </div>
+            :
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -1056,6 +1263,7 @@ export default function AttendanceManager() {
                 </div>
               </CardContent>
             </Card>
+
           )}
         </TabsContent>
 

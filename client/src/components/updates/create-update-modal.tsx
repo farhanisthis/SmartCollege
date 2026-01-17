@@ -127,17 +127,20 @@ export default function CreateUpdateModal({
         data-testid="create-update-modal"
       >
         <DialogHeader>
-          <DialogTitle
-            data-testid="modal-title"
-            className="flex items-center gap-2"
-          >
-            <Sparkles className="h-5 w-5" />
-            Create New Update with AI
-          </DialogTitle>
-          <p className="text-sm text-muted-foreground">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="bg-[#f54c4c] p-2 rounded-xl">
+                <Sparkles className="h-5 w-5 text-white" />
+            </div>
+            <DialogTitle
+                data-testid="modal-title"
+                className="text-xl font-black tracking-tight"
+            >
+                Create New Update
+            </DialogTitle>
+          </div>
+          <p className="text-sm text-muted-foreground font-medium leading-relaxed">
             Upload files and/or add context text. AI will automatically
-            categorize content based on meaning, extract titles and deadlines,
-            and organize everything properly.
+            categorize content, extract titles, and organize everything.
           </p>
         </DialogHeader>
 
@@ -174,10 +177,11 @@ export default function CreateUpdateModal({
         <DialogFooter>
           <Button
             type="button"
-            variant="secondary"
+            variant="ghost"
             onClick={handleClose}
             disabled={isProcessing || createMutation.isPending}
             data-testid="button-cancel"
+            className="rounded-2xl h-12 font-black text-muted-foreground"
           >
             Cancel
           </Button>

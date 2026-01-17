@@ -17,7 +17,7 @@ import {
   FileModel,
   UserViewModel,
   AssignmentSubmissionModel,
-  AttendanceModel,
+  DailyAttendanceModel,
   PresentationModel,
   PerformanceMetricsModel,
   type IUserDocument,
@@ -51,9 +51,9 @@ export class MongoStorage implements IStorage {
       };
 
       await mongoose.connect(mongoUri, options);
-      
+
       // MEMORY OPTIMIZATION: Disable mongoose buffering (this is the correct way)
-      mongoose.set('bufferCommands', false);
+      mongoose.set("bufferCommands", false);
       console.log("Connected to MongoDB successfully");
       this.isConnected = true;
 
@@ -176,27 +176,37 @@ export class MongoStorage implements IStorage {
         // 85% attendance rate - randomly miss some days
         const isPresent = Math.random() > 0.15;
 
-        const attendance = new AttendanceModel({
-          _id: randomUUID(),
-          userId: studentId,
-          date: date,
-          status: isPresent
-            ? "present"
-            : Math.random() > 0.5
-            ? "absent"
-            : "late",
-          subject: [
-            "Mathematics",
-            "Physics",
-            "Chemistry",
-            "English",
-            "Computer Science",
-          ][Math.floor(Math.random() * 5)],
-          markedBy: crIds[0],
-          markedAt: new Date(),
-        });
-
-        await attendance.save();
+        const dailyAttendance = await DailyAttendanceModel.findOneAndUpdate(
+          {
+            date: date,
+            classSection: "E1",
+          },
+          {
+            $setOnInsert: {
+              _id: randomUUID(),
+              markedBy: crIds[0],
+            },
+            $push: {
+              students: {
+                studentId: studentId,
+                subjects: [
+                  {
+                    subjectName: [
+                      "Mathematics",
+                      "Physics",
+                      "Chemistry",
+                      "English",
+                      "Computer Science",
+                    ][Math.floor(Math.random() * 5)],
+                    status: isPresent ? "present" : "absent",
+                    timestamp: new Date(),
+                  },
+                ],
+              },
+            },
+          },
+          { upsert: true, new: true }
+        );
       }
     }
 
@@ -341,14 +351,30 @@ export class MongoStorage implements IStorage {
 
     // Create performance metrics for each student
     for (const studentId of studentIds) {
-      const attendanceRecords = await AttendanceModel.find({
-        userId: studentId,
+      const dailyRecords = await DailyAttendanceModel.find({
+        "students.studentId": studentId,
       });
+
+      let totalSubjectInstances = 0;
+      let presentSubjectInstances = 0;
+
+      dailyRecords.forEach((record) => {
+        const studentData = record.students.find(
+          (s) => s.studentId === studentId
+        );
+        if (studentData) {
+          studentData.subjects.forEach((subj) => {
+            totalSubjectInstances++;
+            if (subj.status === "present") {
+              presentSubjectInstances++;
+            }
+          });
+        }
+      });
+
       const attendancePercentage =
-        attendanceRecords.length > 0
-          ? (attendanceRecords.filter((a) => a.status === "present").length /
-              attendanceRecords.length) *
-            100
+        totalSubjectInstances > 0
+          ? (presentSubjectInstances / totalSubjectInstances) * 100
           : 0;
 
       const assignmentSubmissions = await AssignmentSubmissionModel.find({
@@ -498,15 +524,29 @@ export class MongoStorage implements IStorage {
         status: "completed",
       });
 
-      // Calculate attendance percentage
-      const totalAttendance = await AttendanceModel.countDocuments({ userId });
-      const presentAttendance = await AttendanceModel.countDocuments({
-        userId,
-        status: "present",
+      // Calculate attendance percentage using DailyAttendanceModel
+      const dailyRecords = await DailyAttendanceModel.find({
+        "students.studentId": userId,
       });
+
+      let totalSubjectInstances = 0;
+      let presentSubjectInstances = 0;
+
+      dailyRecords.forEach((record) => {
+        const studentData = record.students.find((s) => s.studentId === userId);
+        if (studentData) {
+          studentData.subjects.forEach((subj) => {
+            totalSubjectInstances++;
+            if (subj.status === "present") {
+              presentSubjectInstances++;
+            }
+          });
+        }
+      });
+
       const attendancePercentage =
-        totalAttendance > 0
-          ? Math.round((presentAttendance / totalAttendance) * 100)
+        totalSubjectInstances > 0
+          ? Math.round((presentSubjectInstances / totalSubjectInstances) * 100)
           : 0;
 
       return {
@@ -530,12 +570,22 @@ export class MongoStorage implements IStorage {
     authorId?: string;
     limit?: number;
     offset?: number;
+    search?: string;
   }): Promise<UpdateWithAuthor[]> {
     try {
       await this.ensureConnected();
       const query: any = {};
       if (filters?.category) query.category = filters.category;
       if (filters?.authorId) query.authorId = filters.authorId;
+      
+      if (filters?.search) {
+        const searchRegex = { $regex: filters.search, $options: "i" };
+        query.$or = [
+          { title: searchRegex },
+          { content: searchRegex },
+          { description: searchRegex }
+        ];
+      }
 
       const updates = await UpdateModel.find(query)
         .sort({ createdAt: -1 })
@@ -640,6 +690,7 @@ export class MongoStorage implements IStorage {
     updateData: Partial<InsertUpdate>
   ): Promise<Update | undefined> {
     try {
+      await this.ensureConnected();
       const updated = await UpdateModel.findByIdAndUpdate(id, updateData, {
         new: true,
       }).lean();

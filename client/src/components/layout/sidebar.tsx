@@ -22,27 +22,32 @@ const categoryConfig = {
   all: {
     icon: LayoutGrid,
     label: "All Updates",
-    color: "bg-primary text-primary-foreground",
+    color: "bg-[#f54c4c]",
+    iconColor: "white",
   },
   assignments: {
     icon: ClipboardList,
     label: "Assignments",
-    color: "bg-chart-1/20 text-chart-1",
+    color: "bg-[#f3e8ff]",
+    iconColor: "#a855f7",
   },
   notes: {
     icon: StickyNote,
     label: "Notes",
-    color: "bg-chart-2/20 text-chart-2",
+    color: "bg-[#e0f2fe]",
+    iconColor: "#3b82f6",
   },
   presentations: {
     icon: Presentation,
     label: "Presentations",
-    color: "bg-chart-3/20 text-chart-3",
+    color: "bg-[#fef9c3]",
+    iconColor: "#ca8a04",
   },
   general: {
     icon: Megaphone,
     label: "General Updates",
-    color: "bg-chart-5/20 text-chart-5",
+    color: "bg-[#fee2e2]",
+    iconColor: "#f54c4c",
   },
 };
 
@@ -101,15 +106,16 @@ export default function Sidebar({
               <Button
                 key={category}
                 variant="ghost"
-                className={`w-full justify-start space-x-3 ${
+                className={`w-full justify-start space-x-3 mb-2 rounded-2xl h-12 transition-all ${
                   isSelected
-                    ? "bg-primary text-primary-foreground font-medium"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                    ? "bg-[#f54c4c] text-white shadow-lg font-bold"
+                    : "text-muted-foreground hover:text-foreground hover:bg-[#f1f3f5]"
                 }`}
                 onClick={() => onCategoryChange(category)}
-                data-testid={`category-${category}`}
               >
-                <Icon className="h-4 w-4" />
+                <div className={`p-1.5 rounded-lg ${isSelected ? "bg-white/20" : "bg-muted"}`}>
+                    <Icon className="h-4 w-4" />
+                </div>
                 <span className="flex-1 text-left">{config.label}</span>
                 <Badge
                   variant={isSelected ? "secondary" : "outline"}

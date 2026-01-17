@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Upload, X, FileText, Image, FileIcon } from "lucide-react";
+import { Upload, X, FileText, Image, FileIcon, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface UnifiedUploadProps {
@@ -174,30 +174,29 @@ export function UnifiedUpload({
       <CardContent className="p-6">
         <form className="space-y-4" onSubmit={handleSubmit} autoComplete="off">
           {/* Context Text Area */}
-          <div className="space-y-2">
-            <Label htmlFor="contextText">Context Text (Optional)</Label>
+          <div className="space-y-3">
+            <Label htmlFor="contextText" className="text-[11px] font-black uppercase tracking-widest text-muted-foreground ml-2">Context Text (Optional)</Label>
             <Textarea
               id="contextText"
               placeholder="Add any context, instructions, or additional information here..."
               value={contextText}
               onChange={(e) => setContextText(e.target.value)}
               disabled={disabled || isLoading}
-              className="min-h-[100px] resize-none"
+              className="min-h-[120px] resize-none rounded-2xl p-4 font-medium bg-[#f8f9fa] border-transparent focus:bg-white focus:border-[#f54c4c]/20 transition-all text-sm"
             />
-            <p className="text-sm text-muted-foreground">
-              Provide context to help the AI better categorize your content and
-              automatically extract subject
+            <p className="text-[11px] text-muted-foreground/60 font-medium px-2">
+              Provide context to help the AI better categorize your content.
             </p>
           </div>
           {/* File Upload Area */}
-          <div className="space-y-2">
-            <Label>Files (Optional)</Label>
+          <div className="space-y-3">
+            <Label className="text-[11px] font-black uppercase tracking-widest text-muted-foreground ml-2">Files (Optional)</Label>
             <div
               className={cn(
-                "border-2 border-dashed rounded-lg p-6 text-center transition-colors",
+                "border-2 border-dashed rounded-3xl p-8 text-center transition-all duration-300",
                 isDragOver
-                  ? "border-primary bg-primary/5"
-                  : "border-muted-foreground/25",
+                  ? "border-[#f54c4c] bg-[#f54c4c]/5 scale-[0.99]"
+                  : "border-muted-foreground/20 bg-[#f8f9fa] hover:bg-muted/50",
                 disabled || isLoading
                   ? "opacity-50 cursor-not-allowed"
                   : "cursor-pointer"
@@ -209,13 +208,14 @@ export function UnifiedUpload({
                 !disabled && !isLoading && fileInputRef.current?.click()
               }
             >
-              <Upload className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
-              <p className="text-sm font-medium">
+              <div className="bg-white w-12 h-12 rounded-2xl shadow-sm flex items-center justify-center mx-auto mb-3">
+                <Upload className="h-6 w-6 text-[#f54c4c]" />
+              </div>
+              <p className="text-sm font-black text-foreground">
                 Drop files here or click to browse
               </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                PDF, DOCX, PPT, Images, TXT • Max 50MB per file • Up to{" "}
-                {maxFiles} files
+              <p className="text-[11px] text-muted-foreground mt-1 font-medium">
+                PDF, DOCX, PPT, Images • Max 50MB
               </p>
             </div>
             <input
@@ -283,9 +283,14 @@ export function UnifiedUpload({
               isLoading ||
               (!contextText.trim() && uploadedFiles.length === 0)
             }
-            className="w-full"
+            className="w-full bg-[#f54c4c] hover:bg-[#d43f3f] text-white font-black h-14 rounded-2xl shadow-lg transition-all active:scale-95"
           >
-            {isLoading ? "Processing..." : "Create Update"}
+            {isLoading ? (
+                <div className="flex items-center gap-2">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span>Processing with AI...</span>
+                </div>
+            ) : "Create Update"}
           </Button>
         </form>
       </CardContent>

@@ -67,7 +67,7 @@ export class GeminiV1Client {
         );
       }
 
-      const result = await response.json() as GeminiAPIResponse;
+      const result = (await response.json()) as GeminiAPIResponse;
 
       // Extract text from Gemini response structure
       const text =

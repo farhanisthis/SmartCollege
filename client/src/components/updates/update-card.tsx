@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,8 +26,10 @@ import {
   X,
   Sparkles,
   RefreshCw,
+  Loader2,
 } from "lucide-react";
 import { UpdateWithAuthor } from "@shared/schema";
+import { cn } from "@/lib/utils";
 import { formatDistanceToNow, format, isValid } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -40,22 +42,30 @@ interface UpdateCardProps {
 const categoryConfig = {
   assignments: {
     icon: ClipboardList,
-    color: "bg-chart-1/20 text-chart-1",
-    label: "Assignment",
+    color: "bg-[#f3e8ff]",
+    iconColor: "#a855f7",
+    badgeVariant: "exam" as const,
+    label: "Exam",
   },
   notes: {
     icon: StickyNote,
-    color: "bg-chart-2/20 text-chart-2",
+    color: "bg-[#e0f2fe]",
+    iconColor: "#3b82f6",
+    badgeVariant: "notes" as const,
     label: "Notes",
   },
   presentations: {
     icon: Presentation,
-    color: "bg-chart-3/20 text-chart-3",
+    color: "bg-[#fef9c3]",
+    iconColor: "#ca8a04",
+    badgeVariant: "presentation" as const,
     label: "Presentation",
   },
   general: {
     icon: Megaphone,
-    color: "bg-chart-5/20 text-chart-5",
+    color: "bg-[#fee2e2]",
+    iconColor: "#f54c4c",
+    badgeVariant: "general" as const,
     label: "General",
   },
 };
@@ -155,6 +165,9 @@ export default function UpdateCard({ update, onRefresh }: UpdateCardProps) {
     null
   );
   const [isEnhancing, setIsEnhancing] = useState(false);
+  const [hasTrackedView, setHasTrackedView] = useState(
+    update.hasViewed || false
+  );
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -165,6 +178,55 @@ export default function UpdateCard({ update, onRefresh }: UpdateCardProps) {
 
   // Format deadline for display - check both dueDate and deadlineDate
   const deadlineInfo = formatDeadlineTag(update.deadlineDate || update.dueDate);
+
+  // Track view when card becomes visible (Intersection Observer)
+  useEffect(() => {
+    // Skip if already viewed by this user
+    if (hasTrackedView) {
+      return;
+    }
+
+    const cardElement = document.getElementById(`update-card-${update.id}`);
+    if (!cardElement) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          // If card is at least 50% visible and hasn't been tracked yet
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+            // Mark as viewed immediately to prevent duplicate calls
+            setHasTrackedView(true);
+
+            // Call API to increment view count (only once per user)
+            fetch(`/api/updates/${update.id}`, {
+              credentials: "include",
+            })
+              .then((response) => {
+                if (response.ok) {
+                  onRefresh(); // Refresh to update view count in the UI
+                }
+              })
+              .catch((error) => {
+                console.error("Failed to track view:", error);
+              });
+
+            // Stop observing after view is tracked
+            observer.disconnect();
+          }
+        });
+      },
+      {
+        threshold: 0.5, // Trigger when 50% of card is visible
+        rootMargin: "0px", // No margin
+      }
+    );
+
+    observer.observe(cardElement);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [update.id, hasTrackedView, onRefresh]);
 
   const handleDownload = async (fileId: string, filename: string) => {
     try {
@@ -503,240 +565,73 @@ export default function UpdateCard({ update, onRefresh }: UpdateCardProps) {
   };
 
   return (
-    <Card
-      className="p-6 hover:shadow-lg transition-shadow cursor-pointer"
-      data-testid={`update-card-${update.id}`}
-      onClick={handleCardClick}
-    >
-      <div className="flex items-start justify-between">
-        <div className="flex items-start space-x-4 flex-1">
-          <div className="flex-shrink-0">
-            <div
-              className={`w-10 h-10 ${config.color} rounded-lg flex items-center justify-center`}
-            >
-              <Icon className="h-5 w-5" />
-            </div>
+    <>
+      <Card
+        id={`update-card-${update.id}`}
+        className="p-4 mb-4 hover:shadow-lg transition-all border border-border/50 shadow-card rounded-3xl group cursor-pointer"
+        data-testid={`update-card-${update.id}`}
+        onClick={handleCardClick}
+      >
+        <div className="flex items-center gap-4">
+          {/* Left Icon Box */}
+          <div className={`w-14 h-14 ${config.color} rounded-2xl flex items-center justify-center flex-shrink-0`}>
+            <Icon className="h-6 w-6" style={{ color: config.iconColor }} />
           </div>
 
-          <div className="flex-1">
-            <div className="flex items-center space-x-2 mb-2">
-              <Badge
-                variant="secondary"
-                className={config.color}
-                data-testid="update-category"
-              >
-                {config.label}
-              </Badge>
-              {/* Show "Due Soon" only when deadline is within 2 days */}
-              {deadlineInfo &&
-                (() => {
-                  const deadlineValue = update.deadlineDate || update.dueDate;
-                  if (!deadlineValue) return null;
-
-                  const deadline = new Date(deadlineValue);
-                  const today = new Date();
-                  today.setHours(0, 0, 0, 0);
-                  const deadlineDate = new Date(deadline);
-                  deadlineDate.setHours(0, 0, 0, 0);
-                  const timeDiff = deadlineDate.getTime() - today.getTime();
-                  const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
-
-                  return daysDiff <= 2 && daysDiff >= 0 ? (
-                    <Badge variant="destructive" data-testid="urgent-badge">
-                      Due Soon
-                    </Badge>
-                  ) : null;
-                })()}
-              {deadlineInfo && (
-                <Badge
-                  variant="outline"
-                  className={deadlineInfo.colorClass}
-                  data-testid="deadline-badge"
-                >
-                  📅 {deadlineInfo.text}
+          {/* Content Middle */}
+          <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <Badge variant={config.badgeVariant} className="text-[10px] px-2 py-0.5">
+                  {config.label}
                 </Badge>
-              )}
-            </div>
-
-            <h3
-              className="text-lg font-semibold text-foreground mb-2"
-              data-testid="update-title"
-            >
+                {deadlineInfo && (
+                  <Badge variant="outline" className={cn("text-[10px] px-2 py-0.5 border-none", deadlineInfo.colorClass)}>
+                    {deadlineInfo.text}
+                  </Badge>
+                )}
+                <span className="text-[11px] text-muted-foreground font-bold ml-auto">
+                  {update.createdAt ? format(new Date(update.createdAt), "MMM d") : ""}
+                </span>
+              </div>
+            <h3 className="text-[15px] font-black text-foreground truncate leading-snug">
               {update.title}
             </h3>
-
-            {/* Show description for all updates if available, otherwise show content for general */}
-            {(update.description ||
-              (update.category === "general" && update.content)) && (
-              <div
-                className="text-muted-foreground mb-4 line-clamp-3"
-                data-testid="update-content"
-              >
-                {(update.description || update.content)
-                  ?.split("\n")
-                  .map((line, index) => {
-                    // Check if line starts with bullet point
-                    if (line.trim().startsWith("•")) {
-                      return (
-                        <div
-                          key={index}
-                          className="flex items-start space-x-2 my-1"
-                        >
-                          <span className="text-primary mt-0.5 flex-shrink-0">
-                            •
-                          </span>
-                          <span className="flex-1">
-                            {line.trim().substring(1).trim()}
-                          </span>
-                        </div>
-                      );
-                    }
-                    // Regular paragraph line
-                    return line.trim() ? (
-                      <p key={index} className="my-1">
-                        {line}
-                      </p>
-                    ) : (
-                      <br key={index} />
-                    );
-                  })}
-              </div>
+            {update.content && (
+              <p className="text-[13px] text-muted-foreground truncate font-medium mt-0.5">
+                  {update.content}
+              </p>
             )}
+          </div>
 
-            {/* Files */}
-            {update.files.length > 0 && (
-              <div
-                className="flex flex-wrap gap-2 mb-4"
-                data-testid="update-files"
-              >
-                {update.files.map((file) => {
-                  const FileIcon = getFileIcon(file.mimeType);
-                  return (
-                    <div
-                      key={file.id}
-                      className="flex items-center space-x-2 bg-muted rounded-lg px-3 py-2"
-                      data-testid={`file-${file.id}`}
-                    >
-                      <FileIcon className="h-4 w-4 text-primary" />
-                      <span className="text-sm text-foreground">
-                        {file.originalName}
-                      </span>
-                      <div className="flex space-x-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handlePreview(file)}
-                          data-testid={`button-preview-${file.id}`}
-                          title="Preview file"
-                        >
-                          <Eye className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDownload(file.id, file.filename)}
-                          data-testid={`button-download-${file.id}`}
-                          title="Download file"
-                        >
-                          <Download className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Metadata */}
-            <div className="flex items-center justify-between text-sm text-muted-foreground">
-              <div className="flex items-center space-x-2">
-                <Avatar className="w-6 h-6">
-                  <AvatarImage src="" alt={update.author.name} />
-                  <AvatarFallback data-testid="author-avatar">
-                    {update.author.name
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")}
-                  </AvatarFallback>
-                </Avatar>
-                <span data-testid="author-name">
-                  {update.author.name} (
-                  {update.author.role === "cr" ? "CR" : "Student"})
-                </span>
-              </div>
-              <div className="flex items-center space-x-4">
-                <span
-                  className="flex items-center space-x-1"
-                  data-testid="view-count"
-                >
-                  <Eye className="h-3 w-3" />
-                  <span>{update.viewCount} views</span>
-                </span>
-                {(update.downloadCount || 0) > 0 && (
-                  <span
-                    className="flex items-center space-x-1"
-                    data-testid="download-count"
+          {/* Right Attachment / Actions */}
+          <div className="flex items-center gap-1">
+              {update.files.length > 0 && (
+                  <div className="p-2">
+                      <Download className="h-5 w-5 text-muted-foreground/40" />
+                  </div>
+              )}
+              
+              {/* Action buttons - always visible for better UX */}
+              <div className="flex items-center">
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={handleShare}>
+                      <Share className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete();
+                    }}
+                    disabled={isDeleting}
                   >
-                    <Download className="h-3 w-3" />
-                    <span>{update.downloadCount || 0} downloads</span>
-                  </span>
-                )}
+                      {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                  </Button>
               </div>
-            </div>
           </div>
         </div>
-
-        {/* Posted date and Action buttons */}
-        <div className="flex flex-col items-end space-y-2 ml-4">
-          {/* Posted date */}
-          <div className="text-sm text-muted-foreground border border-gray-300 rounded-md px-2 py-1">
-            <span className="text-xs text-gray-500">posted on </span>
-            {format(new Date(update.createdAt!), "MMM dd, yyyy")}
-          </div>
-
-          {/* Action buttons */}
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleBookmark}
-              className={
-                isBookmarked
-                  ? "text-primary"
-                  : "text-muted-foreground hover:text-foreground"
-              }
-              data-testid="button-bookmark"
-            >
-              <Bookmark
-                className={`h-4 w-4 ${isBookmarked ? "fill-current" : ""}`}
-              />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleShare}
-              className="text-muted-foreground hover:text-foreground"
-              data-testid="button-share"
-            >
-              <Share className="h-4 w-4" />
-            </Button>
-            {/* Delete button - only show for author or CR */}
-            {(user?.id === update.author.id || user?.role === "cr") && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleDelete}
-                disabled={isDeleting}
-                className="text-muted-foreground hover:text-destructive"
-                data-testid="button-delete"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-        </div>
-      </div>
-
+      </Card>
       {/* File Preview Modal */}
       <Dialog open={!!previewFile} onOpenChange={() => closePreview()}>
         <DialogContent className="max-w-5xl w-[90vw] h-[85vh] overflow-hidden p-0">
@@ -1026,6 +921,6 @@ export default function UpdateCard({ update, onRefresh }: UpdateCardProps) {
           </div>
         </DialogContent>
       </Dialog>
-    </Card>
+    </>
   );
 }

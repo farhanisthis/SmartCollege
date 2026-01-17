@@ -1,7 +1,6 @@
 import { Router } from "express";
 import {
   AssignmentSubmissionModel,
-  AttendanceModel,
   DailyAttendanceModel,
   PresentationModel,
   PerformanceMetricsModel,
@@ -12,28 +11,62 @@ import { nanoid } from "nanoid";
 
 const router = Router();
 
-// Middleware to check if user is authenticated
-const requireAuth = (req: any, res: any, next: any) => {
+// Helper to extract section from class string
+function getSection(classStr: string): string | null {
+  const match = classStr.match(/\b(E1|E2|M1|M2)\b/);
+  return match ? match[1] : null;
+}
+
+// Middleware to check if user is authenticated and populate class
+const requireAuth = async (req: any, res: any, next: any) => {
   if (!req.session?.userId) {
     return res.status(401).json({ error: "Authentication required" });
   }
-  next();
+
+  try {
+     const user = await UserModel.findById(req.session.userId);
+     if (!user) return res.status(401).json({ error: "User not found" });
+     
+     req.user = {
+         userId: user.id,
+         role: user.role,
+         username: user.username,
+         class: user.class
+     };
+     next();
+  } catch (err) {
+      console.error("Performance Auth Error:", err);
+      res.status(500).json({ error: "Internal Server Error" });
+  }
 };
 
 // Calculate performance metrics for a user
-async function calculatePerformanceMetrics(userId: string, subject?: string) {
+// @param userId - Should be the student's rollNumber (enrollment number) for attendance matching
+async function calculatePerformanceMetrics(userId: string, section: string, subject?: string) {
   const filter = subject ? { subject } : {};
 
   // Attendance percentage using DailyAttendanceModel
   let totalAttendanceCount = 0;
   let presentCount = 0;
 
-  // Get all daily attendance records
+  if (!section) {
+      console.warn("No section provided for metrics calculation");
+      // Return zeroed metrics or handle as error? For now, return safe defaults.
+      return {
+        attendancePercentage: 0,
+        assignmentCompletion: 0,
+        presentationCompletion: 0,
+        overallScore: 0,
+      };
+  }
+
+  // Get all daily attendance records for the specific section
   const dailyAttendanceRecords = await DailyAttendanceModel.find({
-    classSection: "E1", // Assuming E1 section for now
+    classSection: section, // DYNAMIC SECTION
   });
 
   // Calculate attendance from daily records
+  // Note: studentId in attendance records is the rollNumber, not UUID
   dailyAttendanceRecords.forEach((record) => {
     const studentRecord = record.students.find((s) => s.studentId === userId);
 
@@ -59,12 +92,13 @@ async function calculatePerformanceMetrics(userId: string, subject?: string) {
     totalAttendanceCount > 0 ? (presentCount / totalAttendanceCount) * 100 : 0;
 
   // Assignment completion (based on submission count, not scores)
+  // TODO: Scope assignments by section if needed in future (currently categorized globally)
   const assignments = await UpdateModel.find({
     category: "assignments",
     ...(subject && { subject }),
   });
   const submittedAssignments = await AssignmentSubmissionModel.countDocuments({
-    userId,
+    userId, // Checks submission by UUID (correct)
     updateId: { $in: assignments.map((a) => a._id) },
   });
   const assignmentCompletion =
@@ -101,39 +135,14 @@ async function calculatePerformanceMetrics(userId: string, subject?: string) {
   };
 }
 
-// Debug route to reset sample data
+// Debug route to reset sample data - REMOVED or SIMPLIFIED
+// Removing payload-heavy logic that used legacy models
 router.post(
   "/debug/reset-sample-data",
   requireAuth,
   async (req: any, res: any) => {
-    try {
-      // Clear all existing data
-      await AssignmentSubmissionModel.deleteMany({});
-      await AttendanceModel.deleteMany({});
-      await PresentationModel.deleteMany({});
-      await UpdateModel.deleteMany({});
-
-      // Reinitialize sample data
-      const mongodb = require("../storage/mongodb");
-      const mongoStorage = new mongodb.MongoStorage();
-
-      // Get user IDs
-      const crUser = await UserModel.findOne({ username: "cr1" });
-      const studentUser = await UserModel.findOne({ username: "student1" });
-
-      if (crUser && studentUser) {
-        await mongoStorage.initializeSamplePerformanceData(
-          [crUser._id],
-          [studentUser._id]
-        );
-        res.json({ message: "Sample data reset successfully" });
-      } else {
-        res.status(400).json({ error: "Users not found" });
-      }
-    } catch (error) {
-      console.error("Reset error:", error);
-      res.status(500).json({ error: "Reset failed" });
-    }
+      // Deprecated in favor of the 'Nuke and Pave' strategy
+      res.status(410).json({ error: "This endpoint is deprecated. Use Nuke DB." });
   }
 );
 
@@ -191,8 +200,21 @@ router.post(
 router.get("/metrics", requireAuth, async (req: any, res: any) => {
   try {
     const { subject } = req.query;
+    const userId = req.session.userId;
+
+    // Get user's rollNumber for attendance matching
+    // req.user is populated by requireAuth now
+    const user = req.user;
+    const rollNumber = user?.rollNumber || userId; // Fallback to userId if rollNumber not set
+    const section = getSection(user?.class || "");
+
+    console.log(
+      `[Performance Metrics] User ${userId}, RollNumber: ${rollNumber}, Section: ${section}`
+    );
+
     const metrics = await calculatePerformanceMetrics(
-      req.session.userId,
+      rollNumber, // Use rollNumber instead of userId
+      section || "", // Pass section
       subject
     );
     res.json(metrics);
@@ -207,9 +229,27 @@ router.get("/dashboard", requireAuth, async (req: any, res: any) => {
   try {
     const userId = req.session.userId;
     const { subject } = req.query;
-    const filter = subject ? { subject } : {};
+    // req.user is populated by requireAuth
+    const user = req.user;
+    const rollNumber = user?.rollNumber || userId; // Fallback
+    const section = getSection(user?.class || "");
 
     console.time("Dashboard API Total Time");
+    console.log(
+      `[Performance Dashboard] User ${userId}, RollNumber: ${rollNumber}, Section: ${section}`
+    );
+
+    if (!section) {
+        // Return null/empty data if section not found
+        return res.json({
+            attendance: { recent: [], percentage: 0 },
+            assignments: { pending: [], completion: 0, total: 0, submitted: 0 },
+            presentations: { pending: [], upcoming: [], completion: 0, total: 0, completed: 0 },
+            overall: { score: 0, trend: "flat", streak: 0 },
+            subjectPerformance: [],
+            monthlyProgress: []
+        });
+    }
 
     // Execute all major queries in parallel for better performance
     const thirtyDaysAgo = new Date();
@@ -226,11 +266,11 @@ router.get("/dashboard", requireAuth, async (req: any, res: any) => {
       userPresentations,
       allUserPresentations,
     ] = await Promise.all([
-      // Recent attendance (optimized with projection)
+      // Recent attendance (optimized with projection) - use rollNumber for matching
       DailyAttendanceModel.find({
-        classSection: "E1",
+        classSection: section, // DYNAMIC SECTION
         date: { $gte: thirtyDaysAgo },
-        "students.studentId": userId, // Only get records that contain this user
+        "students.studentId": rollNumber, // Use rollNumber instead of userId
       })
         .select("date students.studentId students.subjects markedBy")
         .sort({ date: -1 })
@@ -278,11 +318,11 @@ router.get("/dashboard", requireAuth, async (req: any, res: any) => {
 
     console.time("Transform Attendance Data");
 
-    // Transform daily attendance records (optimized processing)
+    // Transform daily attendance records (optimized processing) - use rollNumber for matching
     const recentAttendance: any[] = [];
     recentDailyRecords.forEach((dailyRecord) => {
       const studentRecord = dailyRecord.students?.find(
-        (s) => s.studentId === userId
+        (s) => s.studentId === rollNumber // Use rollNumber instead of userId
       );
 
       if (studentRecord) {
@@ -403,7 +443,8 @@ router.get("/dashboard", requireAuth, async (req: any, res: any) => {
 
     // For attendance, we'll still use the calculatePerformanceMetrics function for now
     const attendanceMetrics = await calculatePerformanceMetrics(
-      userId,
+      rollNumber, // Use rollNumber instead of userId for attendance matching
+      section, // Pass section
       subject
     );
 
@@ -447,7 +488,7 @@ router.get("/dashboard", requireAuth, async (req: any, res: any) => {
     // Process attendance (from already fetched recent records)
     recentDailyRecords.forEach((record) => {
       const studentRecord = record.students?.find(
-        (s) => s.studentId === userId
+        (s) => s.studentId === rollNumber // Use rollNumber instead of userId
       );
       if (
         studentRecord?.subjects?.some(
@@ -793,8 +834,10 @@ router.get("/attendance/class", requireAuth, async (req: any, res: any) => {
       let status = "not_marked";
 
       if (dailyAttendance) {
+        // Use rollNumber for matching, fallback to _id if rollNumber not set
+        const studentIdentifier = student.rollNumber || student._id;
         const studentRecord = dailyAttendance.students.find(
-          (s) => s.studentId === student._id
+          (s) => s.studentId === studentIdentifier
         );
 
         if (studentRecord && subject) {
@@ -819,6 +862,7 @@ router.get("/attendance/class", requireAuth, async (req: any, res: any) => {
           id: student._id,
           name: student.name,
           username: student.username,
+          rollNumber: student.rollNumber, // Include rollNumber in response
         },
         status: status,
       });

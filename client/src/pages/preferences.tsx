@@ -26,6 +26,7 @@ import {
   Eye,
   Zap,
   Loader2,
+  GraduationCap,
 } from "lucide-react";
 import { useLocation } from "wouter";
 
@@ -200,32 +201,36 @@ export default function Preferences() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-card border-b border-border">
+      <div className="bg-card border-b border-border sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={goBack}
-                className="h-8 w-8"
+                className="h-10 w-10 rounded-xl"
               >
-                <ArrowLeft className="h-4 w-4" />
+                <ArrowLeft className="h-5 w-5" />
               </Button>
-              <h1 className="text-xl font-semibold">Preferences</h1>
+              <div className="flex items-center space-x-2">
+                <div className="bg-[#f54c4c] p-1.5 rounded-lg">
+                    <GraduationCap className="h-4 w-4 text-white" />
+                </div>
+                <h1 className="text-base font-black tracking-tight">Preferences</h1>
+              </div>
             </div>
-            <Button onClick={handleSave} disabled={isSaving}>
+            <Button 
+                onClick={handleSave} 
+                disabled={isSaving}
+                className="bg-[#f54c4c] hover:bg-[#d43f3f] text-white rounded-2xl h-11 px-6 font-bold transition-all active:scale-95"
+            >
               {isSaving ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saving...
-                </>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
-                <>
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Changes
-                </>
+                <Save className="h-4 w-4 mr-2" />
               )}
+              Save
             </Button>
           </div>
         </div>

@@ -16,14 +16,22 @@ interface AuthenticatedRequest extends Request {
     userId: string;
     role: string;
     username: string;
+    class?: string;
   };
 }
 
 const router = express.Router();
 
+// Helper to extract section from class string
+function getSection(classStr: string): string | null {
+  const match = classStr.match(/\b(E1|E2|M1|M2)\b/);
+  return match ? match[1] : null;
+}
+
 // Helper function to get subjects for a given day of the week
 function getSubjectsForDay(dayOfWeek: string): string[] {
   // E1 Timetable Data
+  // TODO: Make timetable dynamic per section
   const E1Schedule: Record<
     string,
     Record<string, { text: string; bg: string }>
@@ -38,6 +46,9 @@ function getSubjectsForDay(dayOfWeek: string): string[] {
         bg: "from-blue-600 via-blue-500 to-blue-400",
       },
     },
+    // ... (rest of schedule omitted for brevity, keeping existing structure)
+    // NOTE: In a real generalized system, Timetable should be fetched from DB based on section.
+    // For now, we assume E1 schedule or use it as fallback.
     "11:30 AM—12:30 PM": {
       Monday: { text: "CG", bg: "from-blue-600 via-blue-500 to-blue-400" },
       Tuesday: {
@@ -153,19 +164,30 @@ function getSubjectsForDay(dayOfWeek: string): string[] {
 }
 
 // Authentication middleware to populate req.user from session
-const requireAuth = (req: any, res: Response, next: NextFunction) => {
+const requireAuth = async (req: any, res: Response, next: NextFunction) => {
   if (!req.session.userId) {
     return res.status(401).json({ message: "Authentication required" });
   }
 
-  // Populate req.user from session
-  req.user = {
-    userId: req.session.userId,
-    role: req.session.userRole,
-    username: req.session.username,
-  };
+  try {
+    const user = await UserModel.findById(req.session.userId);
+    if (!user) {
+        return res.status(401).json({ message: "User not found" });
+    }
 
-  next();
+    // Populate req.user from session AND DB
+    req.user = {
+        userId: user.id,
+        role: user.role,
+        username: user.username,
+        class: user.class
+    };
+
+    next();
+  } catch (err) {
+      console.error("Auth middleware error:", err);
+      res.status(500).json({ message: "Internal server error" });
+  }
 };
 
 // Middleware to check if user is CR
@@ -197,11 +219,17 @@ router.get(
         });
       }
 
-      console.log(`Fetching attendance for date: ${date}`);
+      const section = getSection(req.user?.class || "");
+      if (!section) {
+         // Return empty if no section is found vs error
+         return res.json({ success: true, data: null });
+      }
+
+      console.log(`Fetching attendance for date: ${date}, Section: ${section}`);
 
       const attendanceRecord = await DailyAttendanceModel.findOne({
         date: new Date(date as string),
-        classSection: "E1",
+        classSection: section, // Dynamic Section
       });
 
       if (attendanceRecord) {
@@ -262,6 +290,11 @@ router.post(
     try {
       const { date, attendance } = req.body;
       const userId = req.user?.userId;
+      const section = getSection(req.user?.class || "");
+
+      if (!section) {
+          return res.status(400).json({ success: false, error: "CR has no valid section" });
+      }
 
       if (!date || !attendance) {
         return res.status(400).json({
@@ -270,7 +303,7 @@ router.post(
         });
       }
 
-      console.log(`Saving attendance for date: ${date} by user: ${userId}`);
+      console.log(`Saving attendance for date: ${date} by user: ${userId} in Section: ${section}`);
       console.log(
         `Attendance data received:`,
         JSON.stringify(attendance, null, 2)
@@ -461,7 +494,7 @@ router.post(
       const attendanceRecord = await DailyAttendanceModel.findOneAndUpdate(
         {
           date: new Date(date),
-          classSection: "E1",
+          classSection: section, // Dynamic
         },
         {
           $setOnInsert: {
@@ -469,7 +502,7 @@ router.post(
           },
           $set: {
             date: new Date(date),
-            classSection: "E1",
+            classSection: section, // Dynamic
             markedBy: userId,
             students: students,
           },
@@ -504,14 +537,18 @@ router.get(
   async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { startDate, endDate, limit = 10 } = req.query;
+      const section = getSection(req.user?.class || "");
 
       console.log(`Fetching attendance history with params:`, {
         startDate,
         endDate,
         limit,
+        section
       });
 
-      const query: any = { classSection: "E1" };
+      if (!section) return res.json({success: true, data: []});
+
+      const query: any = { classSection: section }; // Dynamic
 
       if (startDate && endDate) {
         query.date = {
@@ -547,6 +584,9 @@ router.get(
   async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { month, year } = req.query;
+      const section = getSection(req.user?.class || "");
+      if (!section) return res.json({ success: true, data: { totalDays: 0, avgAttendance: 0, subjectWiseStats: {}, dailyStats: [] } });
+
       const currentMonth = month
         ? parseInt(month as string)
         : new Date().getMonth() + 1;
@@ -555,14 +595,14 @@ router.get(
         : new Date().getFullYear();
 
       console.log(
-        `Calculating attendance stats for ${currentMonth}/${currentYear}`
+        `Calculating attendance stats for ${currentMonth}/${currentYear} Section: ${section}`
       );
 
       const startDate = new Date(currentYear, currentMonth - 1, 1);
       const endDate = new Date(currentYear, currentMonth, 0);
 
       const attendanceRecords = await DailyAttendanceModel.find({
-        classSection: "E1",
+        classSection: section, // Dynamic
         date: { $gte: startDate, $lte: endDate },
       });
 
@@ -660,12 +700,15 @@ router.delete(
   async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { date } = req.params;
+      const section = getSection(req.user?.class || "");
 
-      console.log(`Deleting attendance record for date: ${date}`);
+      if (!section) return res.status(400).json({ error: "No section found" });
+
+      console.log(`Deleting attendance record for date: ${date} Section: ${section}`);
 
       const result = await DailyAttendanceModel.findOneAndDelete({
         date: new Date(date),
-        classSection: "E1",
+        classSection: section, // Dynamic
       });
 
       if (!result) {

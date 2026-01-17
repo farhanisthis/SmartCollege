@@ -6,9 +6,13 @@ export default {
   theme: {
     extend: {
       borderRadius: {
+        xl: "1.5rem",
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+      },
+      boxShadow: {
+        card: "var(--shadow-card)",
       },
       colors: {
         background: "var(--background)",

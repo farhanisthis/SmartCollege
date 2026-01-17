@@ -49,31 +49,16 @@ export default function Header({ onCreateUpdate }: HeaderProps) {
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          <div className="flex items-center space-x-4 ">
-            <div className="flex items-center  space-x-2">
-              <GraduationCap
-                className="text-primary text-2xl"
-                data-testid="logo"
-              />
-              <h1
-                className="text-xl font-bold text-foreground"
-                data-testid="app-name"
-              >
-                SmartUpdates
-              </h1>
+          <div className="flex items-center space-x-3">
+            <div className="bg-[#f54c4c] p-2 rounded-xl shadow-sm">
+              <GraduationCap className="h-6 w-6 text-white" />
             </div>
-
-            {user && !isMobile && (
-              <div className="hidden sm:flex items-center space-x-2 bg-accent px-3 py-1 rounded-full">
-                <span
-                  className="text-sm text-accent-foreground font-medium"
-                  data-testid="user-role"
-                >
-                  {user.role === "cr" ? "Class Representative" : "Student"}
-                </span>
-                <div className="w-2 h-2 bg-primary rounded-full"></div>
-              </div>
-            )}
+            <div className="flex flex-col">
+              <h1 className="text-lg font-black text-foreground leading-none tracking-tight">Smart College</h1>
+              <span className="text-[10px] font-black text-[#f54c4c] uppercase tracking-widest mt-0.5">
+                {user?.role === "cr" ? "CR Dashboard" : "Student Portal"}
+              </span>
+            </div>
           </div>
 
           <div className="flex items-center space-x-2">
@@ -113,25 +98,20 @@ export default function Header({ onCreateUpdate }: HeaderProps) {
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
-                    className="flex items-center space-x-2"
+                    className="flex items-center space-x-2 p-0 h-auto hover:bg-transparent"
                     data-testid="button-user-menu"
                   >
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src="" alt={user.name} />
-                      <AvatarFallback data-testid="user-avatar">
-                        {user.name
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span
-                      className="hidden sm:block text-sm font-medium"
-                      data-testid="user-name"
-                    >
-                      {user.name}
-                    </span>
-                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    <div className="w-10 h-10 rounded-full border-2 border-[#f54c4c] p-0.5 flex items-center justify-center">
+                        <Avatar className="h-full w-full">
+                        <AvatarImage src="" alt={user.name} />
+                        <AvatarFallback className="bg-white text-[#f54c4c] font-bold text-xs" data-testid="user-avatar">
+                            {user.name
+                            .split(" ")
+                            .map((n) => n[0])
+                            .join("")}
+                        </AvatarFallback>
+                        </Avatar>
+                    </div>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">

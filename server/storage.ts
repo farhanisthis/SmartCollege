@@ -44,6 +44,7 @@ export interface IStorage {
     authorId?: string;
     limit?: number;
     offset?: number;
+    search?: string;
   }): Promise<UpdateWithAuthor[]>;
   getUpdate(id: string): Promise<UpdateWithAuthor | undefined>;
   createUpdate(update: InsertUpdate): Promise<Update>;
@@ -182,6 +183,7 @@ export class MemStorage implements IStorage {
     category?: string;
     limit?: number;
     offset?: number;
+    search?: string;
   }): Promise<UpdateWithAuthor[]> {
     console.log("[getUpdates] Starting with filters:", filters);
 
@@ -191,6 +193,16 @@ export class MemStorage implements IStorage {
     if (filters?.category && filters.category !== "all") {
       updatesArray = updatesArray.filter(
         (update) => update.category === filters.category
+      );
+    }
+
+    if (filters?.search) {
+      const query = filters.search.toLowerCase();
+      updatesArray = updatesArray.filter(
+        (update) =>
+          update.title.toLowerCase().includes(query) ||
+          update.content.toLowerCase().includes(query) ||
+          (update.description && update.description.toLowerCase().includes(query))
       );
     }
 

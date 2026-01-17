@@ -1,0 +1,36 @@
+app/(app)/performance.tsx(93,10): error TS17008: JSX element 'View' has no corresponding closing tag.
+app/(app)/performance.tsx(94,58): error TS1003: Identifier expected.
+app/(app)/performance.tsx(94,60): error TS1005: '...' expected.
+app/(app)/performance.tsx(94,65): error TS1005: '}' expected.
+app/(app)/performance.tsx(94,90): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+app/(app)/performance.tsx(94,98): error TS1382: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+app/(app)/performance.tsx(96,43): error TS1382: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+app/(app)/performance.tsx(98,9): error TS1109: Expression expected.
+app/(app)/performance.tsx(100,18): error TS1005: '}' expected.
+app/(app)/performance.tsx(102,24): error TS1005: '}' expected.
+app/(app)/performance.tsx(102,70): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+app/(app)/performance.tsx(103,24): error TS1005: '}' expected.
+app/(app)/performance.tsx(103,61): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+app/(app)/performance.tsx(104,24): error TS1005: '}' expected.
+app/(app)/performance.tsx(104,64): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+app/(app)/performance.tsx(106,9): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+app/(app)/performance.tsx(108,5): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+app/(app)/performance.tsx(110,57): error TS1382: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+app/(app)/performance.tsx(111,13): error TS1005: '}' expected.
+app/(app)/performance.tsx(115,13): error TS1109: Expression expected.
+app/(app)/performance.tsx(118,28): error TS1005: '}' expected.
+app/(app)/performance.tsx(118,76): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+app/(app)/performance.tsx(119,28): error TS1005: '}' expected.
+app/(app)/performance.tsx(119,61): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+app/(app)/performance.tsx(120,28): error TS1005: '}' expected.
+app/(app)/performance.tsx(120,68): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+app/(app)/performance.tsx(126,28): error TS1005: '}' expected.
+app/(app)/performance.tsx(126,66): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+app/(app)/performance.tsx(127,28): error TS1005: '}' expected.
+app/(app)/performance.tsx(127,67): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+app/(app)/performance.tsx(132,35): error TS1005: '}' expected.
+app/(app)/performance.tsx(132,67): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+app/(app)/performance.tsx(133,9): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+app/(app)/performance.tsx(135,5): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+app/(app)/performance.tsx(373,1): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+app/(app)/performance.tsx(374,1): error TS1005: '</' expected.

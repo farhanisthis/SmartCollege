@@ -1,5 +1,5 @@
-import { useState, useCallback, useRef, useEffect } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { useInfiniteQuery, useQuery, useQueryClient, InfiniteData } from "@tanstack/react-query";
 import { useWebSocket } from "@/contexts/WebSocketContext";
 import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/layout/header";
@@ -27,11 +27,13 @@ import {
 } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, BarChart, BookOpen } from "lucide-react";
+import { Plus, Search, BarChart, BookOpen, Loader2, Megaphone, ClipboardList, StickyNote } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 import { UpdateWithAuthor, DashboardStats } from "@shared/schema";
+
+const PAGE_SIZE = 50;
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -61,23 +63,66 @@ export default function Dashboard() {
   const dragCounterRef = useRef(0);
 
   const {
-    data: updates = [],
+    data,
     isLoading: updatesLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
     refetch: refetchUpdates,
-  } = useQuery<UpdateWithAuthor[]>({
-    queryKey: ["/api/updates", selectedCategory],
-    queryFn: async () => {
+  } = useInfiniteQuery<UpdateWithAuthor[]>({
+    queryKey: ["/api/updates", selectedCategory, searchQuery],
+    queryFn: async ({ pageParam = 0 }) => {
       const params = new URLSearchParams();
       if (selectedCategory !== "all") {
         params.append("category", selectedCategory);
       }
+      params.append("limit", PAGE_SIZE.toString());
+      params.append("offset", (pageParam as number).toString());
+      if (searchQuery) {
+        params.append("search", searchQuery);
+      }
+
       const response = await fetch(`/api/updates?${params}`, {
         credentials: "include",
       });
       if (!response.ok) throw new Error("Failed to fetch updates");
       return response.json();
     },
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      // If the last page has fewer items than PAGE_SIZE, we've reached the end
+      if (lastPage.length < PAGE_SIZE) return undefined;
+      // Otherwise, the next offset is the number of pages * PAGE_SIZE
+      return allPages.length * PAGE_SIZE;
+    },
   });
+
+  const updates = useMemo(() => {
+    return data?.pages.flatMap((page) => page) ?? [];
+  }, [data]);
+
+  // Group updates by category for desktop view
+  const desktopGroupedUpdates = useMemo(() => {
+    if (isMobile) return {};
+    
+    const groups: Record<string, UpdateWithAuthor[]> = {
+      assignments: [],
+      notes: [],
+      presentations: [],
+      general: []
+    };
+
+    updates.forEach(update => {
+      const category = update.category?.toLowerCase() || 'general';
+      if (groups[category]) {
+        groups[category].push(update);
+      } else {
+        groups.general.push(update);
+      }
+    });
+
+    return groups;
+  }, [updates, isMobile]);
 
   const { data: stats } = useQuery<DashboardStats>({
     queryKey: ["/api/stats/dashboard"],
@@ -107,29 +152,45 @@ export default function Dashboard() {
         duration: 3000,
       });
 
-      // Update the query cache
-      queryClient.setQueryData(
-        ["/api/updates", selectedCategory],
-        (oldData: UpdateWithAuthor[] | undefined) => {
-          if (!oldData) return [newUpdate];
-          // Check if update already exists to prevent duplicates
-          const exists = oldData.some((update) => update.id === newUpdate.id);
-          if (exists) return oldData;
-          return [newUpdate, ...oldData];
-        }
-      );
+      const updateCache = (category: string) => {
+        queryClient.setQueryData<InfiniteData<UpdateWithAuthor[]>>(
+          ["/api/updates", category],
+          (oldData) => {
+            if (!oldData) {
+              return {
+                pages: [[newUpdate]],
+                pageParams: [0],
+              };
+            }
+
+            // Check if update already exists to prevent duplicates
+            const exists = oldData.pages.some((page) =>
+              page.some((update) => update.id === newUpdate.id)
+            );
+            if (exists) return oldData;
+
+            // Add to the first page
+            const newPages = [...oldData.pages];
+            if (newPages.length > 0) {
+              newPages[0] = [newUpdate, ...newPages[0]];
+            } else {
+              newPages[0] = [newUpdate];
+            }
+
+            return {
+              ...oldData,
+              pages: newPages,
+            };
+          }
+        );
+      };
+
+      // Update current category cache
+      updateCache(selectedCategory);
 
       // Also update the 'all' category cache if we're not already viewing it
       if (selectedCategory !== "all") {
-        queryClient.setQueryData(
-          ["/api/updates", "all"],
-          (oldData: UpdateWithAuthor[] | undefined) => {
-            if (!oldData) return [newUpdate];
-            const exists = oldData.some((update) => update.id === newUpdate.id);
-            if (exists) return oldData;
-            return [newUpdate, ...oldData];
-          }
-        );
+        updateCache("all");
       }
 
       // Invalidate dashboard stats
@@ -145,11 +206,19 @@ export default function Dashboard() {
 
       // Remove from all relevant query caches
       ["all", deletedUpdate.category].forEach((category) => {
-        queryClient.setQueryData(
+        queryClient.setQueryData<InfiniteData<UpdateWithAuthor[]>>(
           ["/api/updates", category],
-          (oldData: UpdateWithAuthor[] | undefined) => {
-            if (!oldData) return [];
-            return oldData.filter((update) => update.id !== deletedUpdate.id);
+          (oldData) => {
+            if (!oldData) return oldData;
+
+            const newPages = oldData.pages.map((page) =>
+              page.filter((update) => update.id !== deletedUpdate.id)
+            );
+
+            return {
+              ...oldData,
+              pages: newPages,
+            };
           }
         );
       });
@@ -167,13 +236,21 @@ export default function Dashboard() {
 
       // Update in all relevant query caches
       ["all", updatedUpdate.category].forEach((category) => {
-        queryClient.setQueryData(
+        queryClient.setQueryData<InfiniteData<UpdateWithAuthor[]>>(
           ["/api/updates", category],
-          (oldData: UpdateWithAuthor[] | undefined) => {
-            if (!oldData) return [updatedUpdate];
-            return oldData.map((update) =>
-              update.id === updatedUpdate.id ? updatedUpdate : update
+          (oldData) => {
+            if (!oldData) return oldData;
+
+            const newPages = oldData.pages.map((page) =>
+              page.map((update) =>
+                update.id === updatedUpdate.id ? updatedUpdate : update
+              )
             );
+
+            return {
+              ...oldData,
+              pages: newPages,
+            };
           }
         );
       });
@@ -243,19 +320,7 @@ export default function Dashboard() {
     [user?.role]
   );
 
-  const filteredUpdates = updates.filter((update) => {
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      return (
-        update.title.toLowerCase().includes(query) ||
-        update.content.toLowerCase().includes(query) ||
-        (update.description &&
-          update.description.toLowerCase().includes(query)) ||
-        update.author.name.toLowerCase().includes(query)
-      );
-    }
-    return true;
-  });
+
 
   const isCR = user?.role === "cr";
 
@@ -326,172 +391,140 @@ export default function Dashboard() {
           />
         )}
 
-        <main className={`flex-1 ${isMobile ? "pb-20" : "lg:pl-8"}`}>
+        <main className={`flex-1 overflow-x-hidden ${isMobile ? "pb-20" : "lg:pl-8"}`}>
           <div
             className={`${
-              isMobile ? "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" : "p-6"
+              isMobile ? "max-w-[100vw] px-4 sm:px-6 lg:px-8" : "p-6"
             }`}
           >
             {/* Page Header */}
-            <div
-              className={`flex flex-col sm:flex-row sm:items-center justify-between mb-8 ${
-                isMobile ? "pt-6" : ""
-              }`}
-            >
+            <div className="flex items-center justify-between mb-8 pt-4">
               <div>
-                <h2
-                  className="text-2xl font-bold text-foreground"
-                  data-testid="page-title"
-                >
-                  Smart College Dashboard
-                </h2>
-                <p
-                  className="text-muted-foreground mt-1"
-                  data-testid="page-subtitle"
-                >
-                  {user?.class} • {user?.name}
+                <h2 className="text-4xl font-black text-foreground tracking-tight">Updates</h2>
+                <p className="text-sm text-muted-foreground font-black mt-1">
+                  Semester 5 • Computer Science
                 </p>
               </div>
 
               {isCR && (
-                <div className="mt-4 sm:mt-0 flex space-x-3">
-                  <Button
+                <Button
                     onClick={() => setIsCreateModalOpen(true)}
-                    className="flex items-center space-x-2"
-                    data-testid="button-new-update"
-                  >
-                    <Plus className="h-4 w-4" />
-                    <span>New Update</span>
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    data-testid="button-search"
-                  >
-                    <Search className="h-4 w-4" />
-                  </Button>
-                </div>
+                    className="bg-[#f54c4c] hover:bg-[#d43f3f] h-14 w-14 rounded-2xl shadow-lg flex items-center justify-center p-0 transition-all active:scale-95"
+                >
+                    <Plus className="h-8 w-8 text-white" />
+                </Button>
               )}
             </div>
 
-            {/* Main Tabs */}
-            <Tabs
-              value={activeTab}
-              onValueChange={setActiveTab}
-              className="space-y-6"
-            >
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger
-                  value="updates"
-                  className="flex items-center space-x-2"
-                >
-                  <BookOpen className="h-4 w-4" />
-                  <span>Updates</span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="performance"
-                  className="flex items-center space-x-2"
-                >
-                  <BarChart className="h-4 w-4" />
-                  <span>Performance</span>
-                </TabsTrigger>
-              </TabsList>
+            {/* Top Navigation Tabs */}
+            <div className="flex items-center gap-6 mb-8 border-b border-border/50">
+              <button 
+                onClick={() => setActiveTab("updates")}
+                className={`pb-4 text-sm font-black uppercase tracking-widest transition-all relative ${activeTab === "updates" ? "text-[#f54c4c]" : "text-muted-foreground/40 hover:text-muted-foreground"}`}
+              >
+                Updates
+                {activeTab === "updates" && <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#f54c4c] rounded-t-full" />}
+              </button>
+              <button 
+                onClick={() => setActiveTab("performance")}
+                className={`pb-4 text-sm font-black uppercase tracking-widest transition-all relative ${activeTab === "performance" ? "text-[#f54c4c]" : "text-muted-foreground/40 hover:text-muted-foreground"}`}
+              >
+                Performance
+                {activeTab === "performance" && <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#f54c4c] rounded-t-full" />}
+              </button>
+            </div>
 
-              {/* Updates Tab */}
-              <TabsContent value="updates" className="space-y-6">
-                {/* Search and Filters */}
-                <Card className="p-4">
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    <div className="flex-1">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                        <Input
-                          type="text"
-                          placeholder="Search updates, files, or content..."
-                          className="pl-10"
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          data-testid="input-search"
-                        />
-                      </div>
-                    </div>
-                    <div className="flex space-x-2">
-                      <Select
-                        value={selectedCategory}
-                        onValueChange={setSelectedCategory}
+            {activeTab === "updates" ? (
+              <>
+                {isMobile ? (
+                  /* Mobile View: Simple List with Pill Filters */
+                  <>
+                    {/* Pill Filters */}
+                    <div className="flex items-center gap-3 mb-10 overflow-x-auto pb-2 scrollbar-hide">
+                      <Button 
+                        variant={selectedCategory === "all" ? "default" : "outline"}
+                        className={`flex items-center gap-2 ${selectedCategory === "all" ? "bg-[#f54c4c] border-transparent" : "bg-white text-foreground border-border"}`}
+                        onClick={() => setSelectedCategory("all")}
                       >
-                        <SelectTrigger
-                          className="w-40"
-                          data-testid="select-category"
-                        >
-                          <SelectValue placeholder="All Categories" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Categories</SelectItem>
-                          <SelectItem value="assignments">
-                            Assignments
-                          </SelectItem>
-                          <SelectItem value="notes">Notes</SelectItem>
-                          <SelectItem value="presentations">
-                            Presentations
-                          </SelectItem>
-                          <SelectItem value="general">General</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Select value={timeFilter} onValueChange={setTimeFilter}>
-                        <SelectTrigger
-                          className="w-32"
-                          data-testid="select-time"
-                        >
-                          <SelectValue placeholder="Time" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="week">Last 7 days</SelectItem>
-                          <SelectItem value="month">Last 30 days</SelectItem>
-                          <SelectItem value="semester">
-                            This semester
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
+                        <Megaphone className="h-4 w-4" />
+                        All Updates
+                      </Button>
+                      <Button 
+                        variant={selectedCategory === "assignments" ? "default" : "outline"}
+                        className={`flex items-center gap-2 ${selectedCategory === "assignments" ? "bg-[#f54c4c] border-transparent" : "bg-white text-muted-foreground border-border"}`}
+                        onClick={() => setSelectedCategory("assignments")}
+                      >
+                        <ClipboardList className="h-4 w-4" />
+                        Assignments
+                      </Button>
+                      <Button 
+                        variant={selectedCategory === "notes" ? "default" : "outline"}
+                        className={`flex items-center gap-2 ${selectedCategory === "notes" ? "bg-[#f54c4c] border-transparent" : "bg-white text-muted-foreground border-border"}`}
+                        onClick={() => setSelectedCategory("notes")}
+                      >
+                        <StickyNote className="h-4 w-4" />
+                        Notes
+                      </Button>
                     </div>
-                  </div>
-                </Card>
 
-                {/* Updates Grid */}
-                <div className="space-y-4" data-testid="updates-grid">
-                  {updatesLoading ? (
-                    <div className="flex items-center justify-center py-12">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    {/* Feed Section Header */}
+                    <div className="flex items-center justify-between mb-4 px-1">
+                      <span className="text-[11px] font-black text-muted-foreground uppercase tracking-widest">Recent Feed</span>
+                      <span className="text-[11px] font-black text-muted-foreground uppercase tracking-widest">{updates.length} Total</span>
                     </div>
-                  ) : filteredUpdates.length === 0 ? (
-                    <Card className="p-12 text-center">
-                      <div className="text-muted-foreground">
-                        <h3
-                          className="text-lg font-medium mb-2"
-                          data-testid="no-updates-title"
-                        >
-                          No updates found
-                        </h3>
-                        <p data-testid="no-updates-description">
-                          {searchQuery
-                            ? "Try adjusting your search terms or filters."
-                            : selectedCategory === "all"
-                            ? "No updates have been posted yet."
-                            : `No ${selectedCategory} updates found.`}
-                        </p>
-                      </div>
-                    </Card>
-                  ) : (
-                    // Show updates based on category
-                    (() => {
-                      // For "all" and "general" categories, show updates directly without grouping
-                      if (
-                        selectedCategory === "all" ||
-                        selectedCategory === "general"
-                      ) {
-                        return (
-                          <div className="space-y-4">
-                            {filteredUpdates.map((update) => (
+
+                    {/* Updates List */}
+                    <div className="space-y-4 pb-32" data-testid="updates-grid">
+                      {updatesLoading ? (
+                        <div className="flex items-center justify-center py-12">
+                          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                        </div>
+                      ) : updates.length === 0 ? (
+                        <Card className="p-12 text-center rounded-3xl border-dashed">
+                          <div className="text-muted-foreground">
+                            <h3 className="text-lg font-black mb-2">No updates found</h3>
+                            <p className="font-medium text-sm">
+                              {searchQuery
+                                ? "Try adjusting your search terms or filters."
+                                : selectedCategory === "all"
+                                ? "No updates have been posted yet."
+                                : `No ${selectedCategory} updates found.`}
+                            </p>
+                          </div>
+                        </Card>
+                      ) : (
+                        <div className="space-y-4">
+                            {updates.map((update) => (
+                                <UpdateCard
+                                key={update.id}
+                                update={update}
+                                onRefresh={refetchUpdates}
+                                />
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  /* Desktop View: Accordion Grouping */
+                  <Accordion type="multiple" defaultValue={["assignments", "notes", "general"]} className="space-y-6 pb-32">
+                    {/* Assignments Section */}
+                    {(desktopGroupedUpdates.assignments?.length ?? 0) > 0 && (
+                      <AccordionItem value="assignments" className="border-none">
+                        <AccordionTrigger className="hover:no-underline py-4 px-2 hover:bg-slate-50/50 rounded-xl transition-all">
+                          <div className="flex items-center gap-3">
+                            <div className="bg-[#f3e8ff] p-2 rounded-lg">
+                              <ClipboardList className="h-5 w-5 text-[#a855f7]" />
+                            </div>
+                            <h3 className="text-lg font-black tracking-tight text-foreground">Assignments</h3>
+                            <Badge variant="secondary" className="bg-[#f3e8ff] text-[#a855f7] border-transparent font-bold">
+                              {desktopGroupedUpdates.assignments?.length}
+                            </Badge>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="pt-4 px-2">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {desktopGroupedUpdates.assignments?.map((update) => (
                               <UpdateCard
                                 key={update.id}
                                 update={update}
@@ -499,78 +532,135 @@ export default function Dashboard() {
                               />
                             ))}
                           </div>
-                        );
-                      }
+                        </AccordionContent>
+                      </AccordionItem>
+                    )}
 
-                      // For specific categories (assignments, notes, presentations), group by subject
-                      const grouped: Record<string, typeof filteredUpdates> =
-                        {};
-                      filteredUpdates.forEach((update) => {
-                        const subject = update.subject || "Other";
-                        if (!grouped[subject]) grouped[subject] = [];
-                        grouped[subject].push(update);
-                      });
-                      return (
-                        <Accordion type="multiple" defaultValue={[]}>
-                          {Object.entries(grouped).map(([subject, updates]) => (
-                            <AccordionItem key={subject} value={subject}>
-                              <AccordionTrigger className="hover:no-underline">
-                                <div className="flex items-center justify-between w-full mr-2">
-                                  <span>{subject}</span>
-                                  <Badge
-                                    variant="secondary"
-                                    className="text-xs"
-                                  >
-                                    {updates.length}
-                                  </Badge>
-                                </div>
-                              </AccordionTrigger>
-                              <AccordionContent>
-                                <div className="space-y-4">
-                                  {updates.map((update) => (
-                                    <UpdateCard
-                                      key={update.id}
-                                      update={update}
-                                      onRefresh={refetchUpdates}
-                                    />
-                                  ))}
-                                </div>
-                              </AccordionContent>
-                            </AccordionItem>
-                          ))}
-                        </Accordion>
-                      );
-                    })()
-                  )}
-                </div>
+                    {/* Notes Section */}
+                    {(desktopGroupedUpdates.notes?.length ?? 0) > 0 && (
+                      <AccordionItem value="notes" className="border-none">
+                        <AccordionTrigger className="hover:no-underline py-4 px-2 hover:bg-slate-50/50 rounded-xl transition-all">
+                          <div className="flex items-center gap-3">
+                            <div className="bg-[#e0f2fe] p-2 rounded-lg">
+                              <StickyNote className="h-5 w-5 text-[#3b82f6]" />
+                            </div>
+                            <h3 className="text-lg font-black tracking-tight text-foreground">Study Notes</h3>
+                            <Badge variant="secondary" className="bg-[#e0f2fe] text-[#3b82f6] border-transparent font-bold">
+                              {desktopGroupedUpdates.notes?.length}
+                            </Badge>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="pt-4 px-2">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {desktopGroupedUpdates.notes?.map((update) => (
+                              <UpdateCard
+                                key={update.id}
+                                update={update}
+                                onRefresh={refetchUpdates}
+                              />
+                            ))}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    )}
 
+                    {/* General Section */}
+                    {(desktopGroupedUpdates.general?.length ?? 0) > 0 && (
+                      <AccordionItem value="general" className="border-none">
+                        <AccordionTrigger className="hover:no-underline py-4 px-2 hover:bg-slate-50/50 rounded-xl transition-all">
+                          <div className="flex items-center gap-3">
+                            <div className="bg-[#fee2e2] p-2 rounded-lg">
+                              <Megaphone className="h-5 w-5 text-[#f54c4c]" />
+                            </div>
+                            <h3 className="text-lg font-black tracking-tight text-foreground">Announcements</h3>
+                            <Badge variant="secondary" className="bg-[#fee2e2] text-[#f54c4c] border-transparent font-bold">
+                              {desktopGroupedUpdates.general?.length}
+                            </Badge>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="pt-4 px-2">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {desktopGroupedUpdates.general?.map((update) => (
+                              <UpdateCard
+                                key={update.id}
+                                update={update}
+                                onRefresh={refetchUpdates}
+                              />
+                            ))}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    )}
+
+                    {updates.length === 0 && (
+                      <Card className="p-12 text-center rounded-3xl border-dashed">
+                        <div className="text-muted-foreground">
+                          <h3 className="text-lg font-black mb-2">No updates found</h3>
+                          <p className="font-medium text-sm">
+                            No updates have been posted yet.
+                          </p>
+                        </div>
+                      </Card>
+                    )}
+                  </Accordion>
+                )}
+                
                 {/* Load More Button */}
-                {filteredUpdates.length > 0 && (
-                  <div className="mt-8 text-center">
-                    <Button variant="secondary" data-testid="button-load-more">
-                      Load More Updates
+                {updates.length > 0 && hasNextPage && isMobile && (
+                  <div className="mt-8 mb-16 text-center">
+                    <Button
+                      variant="outline"
+                      className="bg-[#f1f5f9] border-transparent text-muted-foreground font-black text-xs h-14 px-8 rounded-2xl active:scale-95"
+                      onClick={() => fetchNextPage()}
+                      disabled={isFetchingNextPage}
+                    >
+                      {isFetchingNextPage ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Loading...
+                        </>
+                      ) : (
+                        "LOAD MORE UPDATES"
+                      )}
                     </Button>
                   </div>
                 )}
-              </TabsContent>
-
-              {/* Performance Tab */}
-              <TabsContent value="performance">
+              </>
+            ) : (
+              <div className="pb-32">
                 <PerformanceDashboard />
-              </TabsContent>
-            </Tabs>
+              </div>
+            )}
           </div>
         </main>
       </div>
 
-      {/* Mobile Bottom Navigation */}
-      {isMobile && (
+      {/* Bottom Action Bar */}
+      <div className="hidden md:flex fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-lg z-50 items-center gap-3">
+        <div className="flex-1 bg-white border border-border shadow-2xl rounded-3xl h-16 flex items-center px-6 gap-3 group focus-within:ring-2 focus-within:ring-[#f54c4c]/50 transition-all">
+          <Search className="h-5 w-5 text-muted-foreground/60" />
+          <input 
+            type="text" 
+            placeholder="Search" 
+            className="flex-1 outline-none font-black text-foreground placeholder:text-muted-foreground/40 bg-transparent"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+        <Button className="hidden md:flex bg-[#f54c4c] hover:bg-[#d43f3f] text-white font-black h-16 px-8 rounded-3xl shadow-2xl items-center gap-2 active:scale-95 transition-all">
+          <Megaphone className="h-5 w-5 fill-current" />
+          Manage Alerts
+        </Button>
+      </div>
+
+      {/* Mobile Bottom Navigation - removed for this high-fidelity view or moved */}
+      {/* {isMobile && (
         <MobileBottomNav
           selectedCategory={selectedCategory}
           onCategoryChange={setSelectedCategory}
           stats={stats}
         />
-      )}
+      )} */}
 
       {/* Mobile Floating Action Button */}
       <MobileCreateFab onCreateUpdate={() => setIsCreateModalOpen(true)} />

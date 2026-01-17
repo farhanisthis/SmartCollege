@@ -1,0 +1,18 @@
+
+> rest-express@1.0.0 dev
+> cross-env NODE_ENV=development tsx server/index.ts
+
+[dotenv@17.2.2] injecting env (0) from .env -- tip: 📡 version env with Radar: https://dotenvx.com/radar
+[AI Config] Loaded 8 AI providers
+D:\Exp\SmartCollege\server\routes\bulk-users.ts:22
+router.post("/nuke-db", requireAuth, async (req: any, res: any) => {
+                        ^
+
+
+ReferenceError: Cannot access 'requireAuth' before initialization
+    at <anonymous> (D:\Exp\SmartCollege\server\routes\bulk-users.ts:22:25)
+    at ModuleJob.run (node:internal/modules/esm/module_job:370:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:99:5)
+
+Node.js v24.4.1

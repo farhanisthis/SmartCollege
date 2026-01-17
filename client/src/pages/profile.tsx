@@ -181,19 +181,24 @@ export default function Profile() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-card border-b border-border">
+      <div className="bg-card border-b border-border sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={goBack}
-                className="h-8 w-8"
+                className="h-10 w-10 rounded-xl"
               >
-                <ArrowLeft className="h-4 w-4" />
+                <ArrowLeft className="h-5 w-5" />
               </Button>
-              <h1 className="text-xl font-semibold">Profile Settings</h1>
+              <div className="flex items-center space-x-2">
+                <div className="bg-[#f54c4c] p-1.5 rounded-lg">
+                    <GraduationCap className="h-4 w-4 text-white" />
+                </div>
+                <h1 className="text-base font-black tracking-tight">Profile Settings</h1>
+              </div>
             </div>
             <div className="flex items-center space-x-2">
               {isEditing ? (
@@ -202,25 +207,28 @@ export default function Profile() {
                     variant="outline"
                     onClick={() => setIsEditing(false)}
                     disabled={isSaving}
+                    className="rounded-2xl h-11 px-6 font-bold"
                   >
                     Cancel
                   </Button>
-                  <Button onClick={handleSave} disabled={isSaving}>
+                  <Button 
+                    onClick={handleSave} 
+                    disabled={isSaving}
+                    className="bg-[#f54c4c] hover:bg-[#d43f3f] text-white rounded-2xl h-11 px-6 font-bold"
+                  >
                     {isSaving ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Saving...
-                      </>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     ) : (
-                      <>
-                        <Save className="h-4 w-4 mr-2" />
-                        Save Changes
-                      </>
+                      <Save className="h-4 w-4 mr-2" />
                     )}
+                    Save
                   </Button>
                 </>
               ) : (
-                <Button onClick={() => setIsEditing(true)}>
+                <Button 
+                    onClick={() => setIsEditing(true)}
+                    className="bg-[#f54c4c] hover:bg-[#d43f3f] text-white rounded-2xl h-11 px-6 font-bold"
+                >
                   <Edit3 className="h-4 w-4 mr-2" />
                   Edit Profile
                 </Button>
@@ -238,20 +246,22 @@ export default function Profile() {
               <CardContent className="pt-6">
                 <div className="flex flex-col items-center text-center">
                   <div className="relative">
-                    <Avatar className="h-24 w-24">
-                      <AvatarImage src="" alt={profileData.user.name} />
-                      <AvatarFallback className="text-2xl">
-                        {profileData.user.name
-                          ?.split(" ")
-                          .map((n) => n[0])
-                          .join("")}
-                      </AvatarFallback>
-                    </Avatar>
+                    <div className="w-24 h-24 rounded-full border-4 border-[#f54c4c] p-1 flex items-center justify-center">
+                        <Avatar className="h-full w-full">
+                        <AvatarImage src="" alt={profileData.user.name} />
+                        <AvatarFallback className="text-2xl font-black bg-white text-[#f54c4c]">
+                            {profileData.user.name
+                            ?.split(" ")
+                            .map((n) => n[0])
+                            .join("")}
+                        </AvatarFallback>
+                        </Avatar>
+                    </div>
                     {isEditing && (
                       <Button
                         size="icon"
                         variant="secondary"
-                        className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full"
+                        className="absolute bottom-0 right-0 h-8 w-8 rounded-full border-2 border-white shadow-lg bg-[#f54c4c] text-white hover:bg-[#d43f3f]"
                       >
                         <Camera className="h-4 w-4" />
                       </Button>
@@ -353,9 +363,9 @@ export default function Profile() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <Label htmlFor="name">Full Name</Label>
+                      <Label htmlFor="name" className="text-[11px] font-black uppercase tracking-widest text-muted-foreground ml-2 mb-2 block">Full Name</Label>
                       <Input
                         id="name"
                         value={formData.name}
@@ -363,56 +373,18 @@ export default function Profile() {
                           handleInputChange("name", e.target.value)
                         }
                         disabled={!isEditing}
-                        className="mt-1"
+                        className="h-12 rounded-2xl px-6 font-bold bg-[#f8f9fa] border-transparent focus:bg-white focus:border-[#f54c4c]/20 transition-all"
                       />
                     </div>
                     <div>
-                      <Label htmlFor="username">Username</Label>
+                      <Label htmlFor="username" className="text-[11px] font-black uppercase tracking-widest text-muted-foreground ml-2 mb-2 block">Username</Label>
                       <Input
                         id="username"
                         value={profileData.user.username}
                         disabled
-                        className="mt-1 bg-muted"
+                        className="h-12 rounded-2xl px-6 font-bold bg-[#f1f3f5] border-transparent text-muted-foreground opacity-60"
                       />
                     </div>
-                    <div>
-                      <Label htmlFor="phone">Phone Number</Label>
-                      <Input
-                        id="phone"
-                        value={formData.phone}
-                        onChange={(e) =>
-                          handleInputChange("phone", e.target.value)
-                        }
-                        disabled={!isEditing}
-                        placeholder="Enter your phone number"
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="location">Location</Label>
-                      <Input
-                        id="location"
-                        value={formData.location}
-                        onChange={(e) =>
-                          handleInputChange("location", e.target.value)
-                        }
-                        disabled={!isEditing}
-                        placeholder="City, Country"
-                        className="mt-1"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <Label htmlFor="bio">Bio</Label>
-                    <Textarea
-                      id="bio"
-                      value={formData.bio}
-                      onChange={(e) => handleInputChange("bio", e.target.value)}
-                      disabled={!isEditing}
-                      placeholder="Tell us about yourself..."
-                      className="mt-1"
-                      rows={3}
-                    />
                   </div>
                 </CardContent>
               </Card>

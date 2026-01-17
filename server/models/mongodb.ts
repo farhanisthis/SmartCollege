@@ -9,13 +9,6 @@ export interface IUserDocument extends Document {
   name: string;
   class: string;
   createdAt: Date;
-  // Extended profile fields
-  phone?: string;
-  location?: string;
-  bio?: string;
-  department?: string;
-  year?: string;
-  rollNumber?: string;
   // Preferences
   preferences?: {
     notifications?: {
@@ -42,6 +35,7 @@ export interface IUserDocument extends Document {
     language?: string;
     timezone?: string;
   };
+  rollNumber?: string;
 }
 
 const UserSchema = new Schema<IUserDocument>({
@@ -52,13 +46,6 @@ const UserSchema = new Schema<IUserDocument>({
   name: { type: String, required: true },
   class: { type: String, required: true },
   createdAt: { type: Date, default: Date.now },
-  // Extended profile fields
-  phone: { type: String },
-  location: { type: String },
-  bio: { type: String },
-  department: { type: String },
-  year: { type: String },
-  rollNumber: { type: String },
   // Preferences
   preferences: {
     notifications: {
@@ -89,6 +76,7 @@ const UserSchema = new Schema<IUserDocument>({
     language: { type: String, default: "en" },
     timezone: { type: String, default: "UTC" },
   },
+  rollNumber: { type: String },
 });
 
 // Update Model
@@ -202,26 +190,8 @@ const AssignmentSubmissionSchema = new Schema<IAssignmentSubmissionDocument>({
   feedback: { type: String },
 });
 
-// Individual Attendance Record (kept for backward compatibility)
-export interface IAttendanceDocument extends Document {
-  _id: string;
-  userId: string;
-  date: Date;
-  status: "present" | "absent" | "late";
-  subject?: string;
-  markedBy: string; // CR who marked attendance
-  markedAt: Date;
-}
+// Attendance Model removed (Legacy)
 
-const AttendanceSchema = new Schema<IAttendanceDocument>({
-  _id: { type: String, required: true },
-  userId: { type: String, required: true },
-  date: { type: Date, required: true },
-  status: { type: String, enum: ["present", "absent", "late"], required: true },
-  subject: { type: String },
-  markedBy: { type: String, required: true },
-  markedAt: { type: Date, default: Date.now },
-});
 
 // Daily Attendance Sheet Model (New timetable-based system)
 export interface IDailyAttendanceDocument extends Document {
@@ -374,7 +344,8 @@ UserViewSchema.index({ userId: 1, updateId: 1 }, { unique: true });
 // Create unique compound index for assignment submissions
 AssignmentSubmissionSchema.index({ updateId: 1, userId: 1 }, { unique: true });
 // Create unique compound index for attendance
-AttendanceSchema.index({ userId: 1, date: 1, subject: 1 }, { unique: true });
+// AttendanceSchema removed
+
 // Create unique compound index for daily attendance sheets
 DailyAttendanceSchema.index({ date: 1, classSection: 1 }, { unique: true });
 DailyAttendanceSchema.index({ markedBy: 1, date: -1 });
@@ -398,10 +369,6 @@ export const AssignmentSubmissionModel =
     "AssignmentSubmission",
     AssignmentSubmissionSchema
   );
-export const AttendanceModel = mongoose.model<IAttendanceDocument>(
-  "Attendance",
-  AttendanceSchema
-);
 export const DailyAttendanceModel = mongoose.model<IDailyAttendanceDocument>(
   "DailyAttendance",
   DailyAttendanceSchema

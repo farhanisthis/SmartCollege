@@ -32,4 +32,4 @@ add-*.cjs
 seed-*.cjs
 verify-*.cjs
 *.py
-cleanup-script.sh
+cleanup-script.shserver_log.txt

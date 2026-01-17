@@ -44,6 +44,7 @@ import {
   SelectValue,
 } from "../ui/select";
 import type { DateRange } from "react-day-picker";
+import { useAuth } from "../../hooks/use-auth";
 
 interface AttendanceRecord {
   date: string;
@@ -90,6 +91,7 @@ interface AttendanceData {
 }
 
 export default function StudentAttendanceTracker() {
+  const { user } = useAuth();
   const [attendanceData, setAttendanceData] = useState<AttendanceData | null>(
     null
   );
@@ -115,15 +117,60 @@ export default function StudentAttendanceTracker() {
       { present: number; total: number; percentage: number }
     > = {};
 
-    // Get current user ID from session (you might need to get this from auth context)
-    const currentUserId =
-      window.localStorage.getItem("userId") ||
-      "026a8bf4-aedd-4f53-9459-79a01933f8b7"; // fallback to known student ID
+    // Get current user ID from auth context
+    // IMPORTANT: Use rollNumber (enrollment number) to match with attendance records
+    // Database stores attendance with enrollment numbers like "00124402023"
+    const currentUserId = user?.rollNumber || user?.id;
+
+    console.log("[Attendance Tracker] User info:", {
+      userId: user?.id,
+      rollNumber: user?.rollNumber,
+      usingId: currentUserId,
+      name: user?.name,
+    });
+
+    if (!currentUserId) {
+      console.error("No user ID or rollNumber available");
+      return {
+        attendanceHistory: [],
+        statistics: {
+          totalClasses: 0,
+          totalPresent: 0,
+          totalAbsent: 0,
+          overallPercentage: 0,
+          trend: "stable",
+          currentStreak: 0,
+          maxStreak: 0,
+          subjectWiseStats: {},
+        },
+        insights: {
+          last7DaysPercentage: 0,
+          previous7DaysPercentage: 0,
+          needsImprovement: true,
+          excellentAttendance: false,
+          riskSubjects: [],
+        },
+      };
+    }
 
     for (const record of rawData) {
+      console.log("[Attendance Tracker] Processing record:", {
+        date: record.date,
+        totalStudents: record.students?.length,
+        sampleStudentIds: record.students
+          ?.slice(0, 3)
+          .map((s: any) => s.studentId),
+      });
+
       const studentRecord = record.students?.find(
         (s: any) => s.studentId === currentUserId
       );
+
+      console.log("[Attendance Tracker] Match result:", {
+        lookingFor: currentUserId,
+        found: !!studentRecord,
+        subjectCount: studentRecord?.subjects?.length,
+      });
 
       if (studentRecord) {
         for (const subjectRecord of studentRecord.subjects) {
@@ -426,6 +473,41 @@ export default function StudentAttendanceTracker() {
       )
     : [];
 
+  // Handle user not authenticated
+  if (!user) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center">
+          <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-600 mb-2">
+            Authentication Required
+          </h3>
+          <p className="text-gray-500">
+            Please log in to view your attendance records.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Handle error state
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center">
+          <XCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-600 mb-2">
+            Error Loading Attendance
+          </h3>
+          <p className="text-gray-500 mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()} variant="outline">
+            Retry
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -464,24 +546,23 @@ export default function StudentAttendanceTracker() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">
+          <h2 className="text-xl md:text-2xl font-bold text-gray-900">
             My Attendance Tracker
           </h2>
-          <p className="text-gray-600">
-            Track your attendance, view trends, and monitor your academic
-            progress
+          <p className="text-sm md:text-base text-gray-600">
+            Track your attendance and academic progress
           </p>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 md:gap-4 w-full md:w-auto">
           {/* View Mode Toggle */}
           <Select
             value={viewMode}
             onValueChange={(value: any) => setViewMode(value)}
           >
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="w-full md:w-[140px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -493,7 +574,7 @@ export default function StudentAttendanceTracker() {
 
           {/* Subject Filter */}
           <Select value={selectedSubject} onValueChange={setSelectedSubject}>
-            <SelectTrigger className="w-[160px]">
+            <SelectTrigger className="w-full md:w-[160px]">
               <Filter className="h-4 w-4 mr-2" />
               <SelectValue />
             </SelectTrigger>
@@ -512,7 +593,7 @@ export default function StudentAttendanceTracker() {
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
-                className="w-[240px] justify-start text-left font-normal"
+                className="w-full md:w-[240px] justify-start text-left font-normal"
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
                 {dateRange?.from ? (
@@ -544,7 +625,7 @@ export default function StudentAttendanceTracker() {
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">

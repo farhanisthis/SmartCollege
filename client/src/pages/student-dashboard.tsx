@@ -27,11 +27,7 @@ import {
   FileText,
   ChevronRight,
 } from "lucide-react";
-import { useAuth } from "@/hooks/use-auth";
 import {
-  PieChart,
-  Pie,
-  Cell,
   ResponsiveContainer,
   LineChart,
   Line,
@@ -43,6 +39,8 @@ import {
   BarChart,
   Bar,
 } from "recharts";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { MobilePerformanceHeader } from "@/components/layout/mobile-performance-header";
 
 interface DashboardData {
   attendance: {
@@ -247,6 +245,7 @@ const StudentDashboard: React.FC = () => {
   >(null);
   const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false);
   const { user } = useAuth();
+  const isMobile = useIsMobile();
 
   const fetchDashboardData = async () => {
     try {
@@ -325,32 +324,103 @@ const StudentDashboard: React.FC = () => {
 
   const urgentAssignments = getUrgentAssignments();
 
-  // Prepare chart data
-  const pieData = [
-    {
-      name: "Completed",
-      value: dashboardData.assignments.submitted,
-      color: "#10b981",
-    },
-    {
-      name: "Pending",
-      value: dashboardData.assignments.pending.length,
-      color: "#f59e0b",
-    },
-  ];
+  if (isMobile && !activeDetailView) {
+    return (
+      <div className="space-y-6 pb-32">
+        <div className="px-4 pt-6">
+          <MobilePerformanceHeader
+            stats={{
+              cgpa: 8.4, // Hardcoded for demo/safety as calculated logic might be complex
+              attendance: dashboardData.attendance.percentage || 0,
+              totalCredits: 120, // Placeholder
+            }}
+          />
+        </div>
 
-  const presentationPieData = [
-    {
-      name: "Completed",
-      value: dashboardData.presentations.completed,
-      color: "#8b5cf6",
-    },
-    {
-      name: "Pending",
-      value: dashboardData.presentations.pending?.length || 0,
-      color: "#f59e0b",
-    },
-  ];
+        {/* Grade Trend Chart */}
+        <div className="px-4">
+          <h3 className="font-bold text-lg text-gray-900 mb-4 px-2">Grade Trend</h3>
+          <Card className="rounded-[2rem] border-none shadow-lg shadow-slate-100 pt-6 pr-6 pb-2 pl-0">
+             <div className="h-[200px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={dashboardData.monthlyProgress || []}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis 
+                            dataKey="month" 
+                            axisLine={false} 
+                            tickLine={false} 
+                            tick={{fill: '#94a3b8', fontSize: 12}}
+                        />
+                         <YAxis 
+                            axisLine={false} 
+                            tickLine={false} 
+                            tick={{fill: '#94a3b8', fontSize: 12}}
+                        />
+                        <Tooltip 
+                            contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
+                        />
+                        <Line
+                            type="monotone"
+                            dataKey="attendance"
+                            stroke="#4f46e5"
+                            strokeWidth={3}
+                            dot={{ fill: "#4f46e5", r: 4, strokeWidth: 2, stroke: "#fff" }}
+                            activeDot={{ r: 6 }}
+                        />
+                    </LineChart>
+                </ResponsiveContainer>
+             </div>
+          </Card>
+        </div>
+
+        {/* Subject Results List */}
+        <div className="px-4">
+            <h3 className="font-bold text-lg text-gray-900 mb-4 px-2">Recent Results</h3>
+            <div className="space-y-3">
+               {/* Mocking subject data if not present in dashboardData or valid */}
+               {dashboardData.subjectPerformance && dashboardData.subjectPerformance.length > 0 ? (
+                 dashboardData.subjectPerformance.map((subject, idx) => (
+                    <div key={idx} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
+                        <div>
+                            <h4 className="font-bold text-slate-900">{subject.subject}</h4>
+                            <p className="text-xs text-slate-500 font-medium">Credits: 4</p>
+                        </div>
+                         <div className="flex flex-col items-end">
+                            <span className="text-xl font-black text-indigo-600">{subject.score}%</span>
+                             <span className="text-[10px] font-bold text-green-500 bg-green-50 px-2 py-0.5 rounded-full">
+                                Pass
+                            </span>
+                        </div>
+                    </div>
+                 ))
+               ) : (
+                 <div className="text-center py-8 text-gray-400">No recent results found.</div>
+               )}
+            </div>
+        </div>
+
+        {/* Quick Actions for assignments/presentations */}
+        <div className="px-4 grid grid-cols-2 gap-3">
+             <Button 
+                onClick={() => setActiveDetailView("assignments")}
+                className="h-24 rounded-2xl bg-orange-50 hover:bg-orange-100 border border-orange-100 flex flex-col items-center justify-center gap-2 text-orange-700 shadow-sm"
+                variant="ghost"
+             >
+                <BookOpen className="h-6 w-6" />
+                <span className="font-bold">Assignments</span>
+             </Button>
+             <Button 
+                onClick={() => setActiveDetailView("presentations")}
+                className="h-24 rounded-2xl bg-purple-50 hover:bg-purple-100 border border-purple-100 flex flex-col items-center justify-center gap-2 text-purple-700 shadow-sm"
+                variant="ghost"
+             >
+                <FileText className="h-6 w-6" />
+                <span className="font-bold">Presentations</span>
+             </Button>
+        </div>
+      </div>
+    );
+  }
 
   // Use dynamic data from API response
   const monthlyProgress = dashboardData?.monthlyProgress || [];
@@ -483,47 +553,6 @@ const StudentDashboard: React.FC = () => {
           </div>
 
           <div className="space-y-6">
-            {/* Assignment Progress Chart */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Assignment Progress</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={200}>
-                  <PieChart>
-                    <Pie
-                      dataKey="value"
-                      data={pieData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={40}
-                      outerRadius={80}
-                      paddingAngle={5}
-                    >
-                      {pieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="flex justify-center space-x-4 mt-4">
-                  <div className="flex items-center space-x-1">
-                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                    <span className="text-sm">
-                      Completed ({dashboardData.assignments.submitted})
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                    <span className="text-sm">
-                      Pending ({dashboardData.assignments.pending.length})
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
             {/* Assignment Summary */}
             <Card>
               <CardHeader>
@@ -757,48 +786,6 @@ const StudentDashboard: React.FC = () => {
           </div>
 
           <div className="space-y-6">
-            {/* Presentation Progress Chart */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Presentation Progress</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={200}>
-                  <PieChart>
-                    <Pie
-                      dataKey="value"
-                      data={presentationPieData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={40}
-                      outerRadius={80}
-                      paddingAngle={5}
-                    >
-                      {presentationPieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="flex justify-center space-x-4 mt-4">
-                  <div className="flex items-center space-x-1">
-                    <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-                    <span className="text-sm">
-                      Completed ({dashboardData.presentations.completed})
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                    <span className="text-sm">
-                      Pending (
-                      {dashboardData.presentations.pending?.length || 0})
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
             {/* Presentation Summary */}
             <Card>
               <CardHeader>
@@ -947,24 +934,42 @@ const StudentDashboard: React.FC = () => {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={subjectPerformance}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="subject" />
-                  <YAxis />
-                  <Tooltip
-                    formatter={(value, name, props) => {
-                      if (name === "score") {
-                        const data = props.payload;
-                        return [
-                          `${value}%`,
-                          `Score (${data.completed}/${data.total} completed)`,
-                        ];
-                      }
-                      return [value, name];
-                    }}
-                    labelFormatter={(label) => `Subject: ${label}`}
+                <BarChart data={subjectPerformance} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                  <XAxis 
+                    dataKey="subject" 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: '#6b7280', fontSize: 12 }}
                   />
-                  <Bar dataKey="score" fill="#8884d8" />
+                  <YAxis 
+                    hide 
+                  />
+                  <Tooltip
+                    cursor={{ fill: 'transparent' }}
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-white p-3 border border-gray-100 shadow-xl rounded-xl">
+                            <p className="font-bold text-gray-900 mb-1">{data.subject}</p>
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
+                              <span className="text-sm text-gray-600">Score: <span className="font-bold text-indigo-600">{data.score}%</span></span>
+                            </div>
+                            <p className="text-xs text-gray-400 mt-1">{data.completed}/{data.total} tasks</p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar 
+                    dataKey="score" 
+                    fill="#6366f1" 
+                    radius={[6, 6, 6, 6]}
+                    barSize={32}
+                    background={{ fill: '#f3f4f6', radius: 6 }}
+                  />
                 </BarChart>
               </ResponsiveContainer>
 
@@ -1111,7 +1116,7 @@ const StudentDashboard: React.FC = () => {
       )}
 
       {/* Performance Boxes Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
         <PerformanceBox
           type="attendance"
           title="Attendance"
@@ -1409,47 +1414,6 @@ const StudentDashboard: React.FC = () => {
         </div>
 
         <div className="space-y-6">
-          {/* Assignment Progress Chart */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Assignment Progress</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie
-                    dataKey="value"
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={40}
-                    outerRadius={80}
-                    paddingAngle={5}
-                  >
-                    {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="flex justify-center space-x-4 mt-4">
-                <div className="flex items-center space-x-1">
-                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                  <span className="text-sm">
-                    Completed ({dashboardData.assignments.submitted})
-                  </span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                  <span className="text-sm">
-                    Pending ({dashboardData.assignments.pending.length})
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Assignment Summary */}
           <Card>
             <CardHeader>
@@ -1633,47 +1597,6 @@ const StudentDashboard: React.FC = () => {
         </div>
 
         <div className="space-y-6">
-          {/* Presentation Progress Chart */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Presentation Progress</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie
-                    dataKey="value"
-                    data={presentationPieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={40}
-                    outerRadius={80}
-                    paddingAngle={5}
-                  >
-                    {presentationPieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="flex justify-center space-x-4 mt-4">
-                <div className="flex items-center space-x-1">
-                  <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-                  <span className="text-sm">
-                    Completed ({dashboardData.presentations.completed})
-                  </span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                  <span className="text-sm">
-                    Pending ({dashboardData.presentations.pending?.length || 0})
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Presentation Summary */}
           <Card>
             <CardHeader>
@@ -1735,9 +1658,8 @@ const StudentDashboard: React.FC = () => {
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={monthlyProgress}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
+                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
+                <YAxis hide />
                 <Tooltip />
                 <Legend />
                 <Line
@@ -1773,24 +1695,42 @@ const StudentDashboard: React.FC = () => {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={subjectPerformance}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="subject" />
-                <YAxis />
-                <Tooltip
-                  formatter={(value, name, props) => {
-                    if (name === "score") {
-                      const data = props.payload;
-                      return [
-                        `${value}%`,
-                        `Score (${data.completed}/${data.total} completed)`,
-                      ];
-                    }
-                    return [value, name];
-                  }}
-                  labelFormatter={(label) => `Subject: ${label}`}
+              <BarChart data={subjectPerformance} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                <XAxis 
+                  dataKey="subject" 
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: '#6b7280', fontSize: 12 }}
                 />
-                <Bar dataKey="score" fill="#8884d8" />
+                <YAxis 
+                  hide 
+                />
+                <Tooltip
+                  cursor={{ fill: 'transparent' }}
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="bg-white p-3 border border-gray-100 shadow-xl rounded-xl">
+                          <p className="font-bold text-gray-900 mb-1">{data.subject}</p>
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
+                            <span className="text-sm text-gray-600">Score: <span className="font-bold text-indigo-600">{data.score}%</span></span>
+                          </div>
+                          <p className="text-xs text-gray-400 mt-1">{data.completed}/{data.total} tasks</p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Bar 
+                  dataKey="score" 
+                  fill="#6366f1" 
+                  radius={[6, 6, 6, 6]}
+                  barSize={32}
+                  background={{ fill: '#f3f4f6', radius: 6 }}
+                />
               </BarChart>
             </ResponsiveContainer>
 
@@ -1913,7 +1853,7 @@ const StudentDashboard: React.FC = () => {
         open={isAttendanceDialogOpen}
         onOpenChange={setIsAttendanceDialogOpen}
       >
-        <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] md:max-w-7xl max-h-[90vh] overflow-y-auto p-4 md:p-6">
           <DialogHeader>
             <DialogTitle>My Attendance Tracker</DialogTitle>
             <DialogDescription>

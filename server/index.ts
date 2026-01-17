@@ -8,13 +8,25 @@ import { initializeWebSocket } from "./services/websocket";
 const app = express();
 
 // CORS middleware
+// CORS middleware
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
+  const origin = req.headers.origin;
+  
+  // Allow ANY origin in development/testing to support LocalTunnel, IPs, etc.
+  // echo back the origin to support credentials
+  if (origin) {
+    res.header("Access-Control-Allow-Origin", origin);
+  } else {
+    // Mobile apps sometimes don't send Origin; allow * or specific defaults
+    res.header("Access-Control-Allow-Origin", "*");
+  }
+  
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.header(
     "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+    "Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie, Bypass-Tunnel-Reminder"
   );
+  res.header("Access-Control-Allow-Credentials", "true");
 
   if (req.method === "OPTIONS") {
     res.sendStatus(200);
@@ -111,3 +123,4 @@ app.use((req, res, next) => {
     log(`serving on http://${host}:${port}`);
   });
 })();
+// touch
