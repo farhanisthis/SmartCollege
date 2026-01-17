@@ -28,9 +28,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkAuth();
   }, []);
 
+  const getApiUrl = (endpoint: string) => {
+    const apiBase = import.meta.env.VITE_API_URL || "";
+    return `${apiBase}${endpoint}`;
+  };
+
   const checkAuth = async () => {
     try {
-      const response = await fetch("/api/auth/me", {
+      const response = await fetch(getApiUrl("/api/auth/me"), {
         credentials: "include",
       });
 
@@ -46,7 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const login = async (username: string, password: string) => {
-    const response = await fetch("/api/auth/login", {
+    const response = await fetch(getApiUrl("/api/auth/login"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -66,7 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
-      await fetch("/api/auth/logout", {
+      await fetch(getApiUrl("/api/auth/logout"), {
         method: "POST",
         credentials: "include",
       });

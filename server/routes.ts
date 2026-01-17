@@ -10,7 +10,7 @@ import {
   analyzeImage,
   processContentWithFiles,
 } from "./services/ai";
-import { aiManager } from "../services/aiManager";
+import { aiManager } from "./services/aiManager.ts";
 import { processInput } from "./services/inputPipeline";
 import {
   textExtractionService,

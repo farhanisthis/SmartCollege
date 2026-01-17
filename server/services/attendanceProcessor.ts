@@ -1,4 +1,4 @@
-import { aiManager } from "../../services/aiManager";
+import { aiManager } from "./aiManager.ts";
 import { UserModel } from "../models/mongodb";
 import { parseAttendanceSheetBasic } from "./basicAttendanceParser";
 

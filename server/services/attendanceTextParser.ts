@@ -1,4 +1,4 @@
-import { aiManager } from "../../services/aiManager";
+import { aiManager } from "./aiManager.ts";
 
 export interface ParsedAttendanceEntry {
   enrollNo: string;

@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: smartcollege-server
+    runtime: node
+    plan: free
+    repo: https://github.com/your-username/your-repo # Update this
+    branch: main    # Update if different
+    rootDir: server # IMPORTANT: Tells Render the app is in 'server' folder
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production

@@ -1812,7 +1812,7 @@ router.post("/test-ai-parsing", async (req: Request, res: Response) => {
 // AI Provider status endpoint
 router.get("/ai-status", async (req: Request, res: Response) => {
   try {
-    const { aiManager } = await import("../../services/aiManager");
+    const { aiManager } = await import("../services/aiManager");
 
     // Refresh Gemini instances to pick up new keys
     aiManager.refreshGeminiInstances();

@@ -633,6 +633,7 @@ export class MongoStorage implements IStorage {
       });
     } catch (error) {
       console.error("Error getting updates:", error);
+      console.error("Query was:", JSON.stringify(filters || {}));
       return [];
     }
   }

@@ -48,7 +48,7 @@ export default function CreateUpdateModal({
         formData.append("files", file);
       });
 
-      const response = await fetch("/api/updates/unified", {
+      const response = await fetch("/api/updates", {
         method: "POST",
         body: formData,
         credentials: "include",

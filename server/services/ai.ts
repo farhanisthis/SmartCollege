@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import pLimit from "p-limit";
 import crypto from "crypto";
-import { aiManager } from "../../services/aiManager";
+import { aiManager } from "./aiManager.ts";
 
 // Fallback to direct Gemini if needed
 const apiKey = process.env.GEMINI_KEY_1 || process.env.GOOGLE_API_KEY;
