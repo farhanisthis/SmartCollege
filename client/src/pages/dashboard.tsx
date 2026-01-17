@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useInfiniteQuery, useQuery, useQueryClient, InfiniteData } from "@tanstack/react-query";
+import { getApiUrl } from "@/lib/queryClient";
 import { useWebSocket } from "@/contexts/WebSocketContext";
 import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/layout/header";
@@ -82,7 +83,7 @@ export default function Dashboard() {
         params.append("search", searchQuery);
       }
 
-      const response = await fetch(`/api/updates?${params}`, {
+      const response = await fetch(getApiUrl(`/api/updates?${params}`), {
         credentials: "include",
       });
       if (!response.ok) throw new Error("Failed to fetch updates");

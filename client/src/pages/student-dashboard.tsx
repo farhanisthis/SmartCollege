@@ -41,6 +41,7 @@ import {
 } from "recharts";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MobilePerformanceHeader } from "@/components/layout/mobile-performance-header";
+import { getApiUrl } from "@/lib/queryClient";
 
 interface DashboardData {
   attendance: {
@@ -143,7 +144,7 @@ const SubmissionModal: React.FC<SubmissionModalProps> = ({
         }
       }
 
-      const response = await fetch(endpoint, {
+      const response = await fetch(getApiUrl(endpoint), {
         method,
         headers: {
           "Content-Type": "application/json",
@@ -250,7 +251,7 @@ const StudentDashboard: React.FC = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/performance/dashboard`);
+      const response = await fetch(getApiUrl("/api/performance/dashboard"));
 
       if (response.ok) {
         const data = await response.json();

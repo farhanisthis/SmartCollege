@@ -7,7 +7,7 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-const getApiUrl = (endpoint: string) => {
+export const getApiUrl = (endpoint: string) => {
   const apiBase = import.meta.env.VITE_API_URL || "";
   return `${apiBase}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
 };

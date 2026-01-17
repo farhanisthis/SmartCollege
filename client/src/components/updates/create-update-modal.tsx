@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, getApiUrl } from "@/lib/queryClient";
 import {
   Dialog,
   DialogContent,
@@ -48,7 +48,7 @@ export default function CreateUpdateModal({
         formData.append("files", file);
       });
 
-      const response = await fetch("/api/updates", {
+      const response = await fetch(getApiUrl("/api/updates"), {
         method: "POST",
         body: formData,
         credentials: "include",
