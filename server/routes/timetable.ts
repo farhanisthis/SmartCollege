@@ -35,7 +35,7 @@ router.get("/:section", async (req: Request, res: Response) => {
 });
 
 // Create timetable slot (CR only)
-router.post("/", async (req: Request, res: Response) => {
+router.post("/", async (req: any, res: Response) => {
   try {
     if (req.user?.role !== "cr") {
       return res.status(403).json({
@@ -79,7 +79,7 @@ router.post("/", async (req: Request, res: Response) => {
 });
 
 // Update timetable slot (CR only)
-router.put("/:id", async (req: Request, res: Response) => {
+router.put("/:id", async (req: any, res: Response) => {
   try {
     if (req.user?.role !== "cr") {
       return res.status(403).json({
@@ -118,7 +118,7 @@ router.put("/:id", async (req: Request, res: Response) => {
 });
 
 // Delete timetable slot (CR only)
-router.delete("/:id", async (req: Request, res: Response) => {
+router.delete("/:id", async (req: any, res: Response) => {
   try {
     if (req.user?.role !== "cr") {
       return res.status(403).json({

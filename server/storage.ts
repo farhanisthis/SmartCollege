@@ -109,6 +109,7 @@ export class MemStorage implements IStorage {
       department: null,
       year: null,
       rollNumber: null,
+      profilePicture: null,
       preferences: null,
     };
     this.users.set(crUser.id, crUser);
@@ -128,6 +129,7 @@ export class MemStorage implements IStorage {
       department: null,
       year: null,
       rollNumber: null,
+      profilePicture: null,
       preferences: null,
     };
     this.users.set(kashishUser.id, kashishUser);
@@ -147,6 +149,7 @@ export class MemStorage implements IStorage {
       department: null,
       year: null,
       rollNumber: null,
+      profilePicture: null,
       preferences: null,
     };
     this.users.set(studentUser.id, studentUser);
@@ -166,6 +169,7 @@ export class MemStorage implements IStorage {
       department: "CS",
       year: "3",
       rollNumber: "CS123", // Valid roll number for performance data
+      profilePicture: null,
       preferences: null,
     };
     this.users.set(issueStudent.id, issueStudent);
@@ -445,8 +449,31 @@ export class MemStorage implements IStorage {
     userId: string,
     preferences: any
   ): Promise<User | undefined> {
-    // Stub implementation - not used since we use MongoStorage
-    return undefined;
+    const existing = this.users.get(userId);
+    if (!existing) return undefined;
+
+    const updated: User = { ...existing, preferences };
+    this.users.set(userId, updated);
+    return updated;
+  }
+
+  async updateUsername(userId: string, newUsername: string): Promise<User | undefined> {
+    const existing = this.users.get(userId);
+    if (!existing) return undefined;
+
+    const updated: User = { ...existing, username: newUsername };
+    this.users.set(userId, updated);
+    return updated;
+  }
+
+  async updatePassword(userId: string, oldPassword: string, newPassword: string): Promise<boolean> {
+      const existing = this.users.get(userId);
+      if (!existing) return false;
+      if (existing.password !== oldPassword) return false;
+
+      const updated: User = { ...existing, password: newPassword };
+      this.users.set(userId, updated);
+      return true;
   }
 
   async getUserStats(userId: string): Promise<{

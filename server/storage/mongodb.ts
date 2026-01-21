@@ -903,6 +903,7 @@ export class MongoStorage implements IStorage {
       department: doc.department,
       year: doc.year,
       rollNumber: doc.rollNumber,
+      profilePicture: doc.profilePicture || null,
       preferences: doc.preferences,
     };
   }

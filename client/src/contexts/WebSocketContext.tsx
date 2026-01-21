@@ -5,7 +5,7 @@ import React, {
   useState,
   ReactNode,
 } from "react";
-import io, { type Socket } from "socket.io-client";
+import io, { Socket } from "socket.io-client";
 import type { UpdateWithAuthor } from "@shared/schema";
 
 interface WebSocketContextType {
@@ -35,7 +35,7 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
       {
         withCredentials: true,
         transports: ["websocket", "polling"], // Fallback to polling if websocket fails
-      }
+      } as any
     );
 
     setSocket(newSocket);

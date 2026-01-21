@@ -235,7 +235,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           year: user.year,
           rollNumber: user.rollNumber,
           createdAt: user.createdAt,
-          passwordChangedAt: user.passwordChangedAt,
         },
         stats,
       });
