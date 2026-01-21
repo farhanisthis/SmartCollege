@@ -468,6 +468,14 @@ export default function Dashboard() {
                         <StickyNote className="h-4 w-4" />
                         Notes
                       </Button>
+                      <Button 
+                        variant={selectedCategory === "presentations" ? "default" : "outline"}
+                        className={`flex items-center gap-2 ${selectedCategory === "presentations" ? "bg-[#f54c4c] border-transparent" : "bg-white text-muted-foreground border-border"}`}
+                        onClick={() => setSelectedCategory("presentations")}
+                      >
+                        <BarChart className="h-4 w-4" />
+                        Presentations
+                      </Button>
                     </div>
 
                     {/* Feed Section Header */}
@@ -556,6 +564,34 @@ export default function Dashboard() {
                         <AccordionContent className="pt-4 px-2">
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {desktopGroupedUpdates.notes?.map((update) => (
+                              <UpdateCard
+                                key={update.id}
+                                update={update}
+                                onRefresh={refetchUpdates}
+                              />
+                            ))}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    )}
+
+                    {/* Presentations Section */}
+                    {(desktopGroupedUpdates.presentations?.length ?? 0) > 0 && (
+                      <AccordionItem value="presentations" className="border-none">
+                        <AccordionTrigger className="hover:no-underline py-4 px-2 hover:bg-slate-50/50 rounded-xl transition-all">
+                          <div className="flex items-center gap-3">
+                            <div className="bg-[#fff7ed] p-2 rounded-lg">
+                              <BarChart className="h-5 w-5 text-[#f97316]" />
+                            </div>
+                            <h3 className="text-lg font-black tracking-tight text-foreground">Presentations</h3>
+                            <Badge variant="secondary" className="bg-[#fff7ed] text-[#f97316] border-transparent font-bold">
+                              {desktopGroupedUpdates.presentations?.length}
+                            </Badge>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="pt-4 px-2">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {desktopGroupedUpdates.presentations?.map((update) => (
                               <UpdateCard
                                 key={update.id}
                                 update={update}

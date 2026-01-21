@@ -597,8 +597,8 @@ export default function UpdateCard({ update, onRefresh }: UpdateCardProps) {
               {update.title}
             </h3>
             {update.content && (
-              <p className="text-[13px] text-muted-foreground truncate font-medium mt-0.5">
-                  {update.content}
+              <p className="text-[13px] text-muted-foreground font-medium mt-1 line-clamp-3 whitespace-pre-line leading-relaxed">
+                  {update.description || update.content}
               </p>
             )}
           </div>

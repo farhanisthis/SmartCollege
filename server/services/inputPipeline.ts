@@ -17,6 +17,7 @@ export interface ProcessedAIResult {
   deadlineDate?: string;
   tags: string[];
   title: string;
+  subject?: string;
   formattedContent: string;
 }
 
@@ -66,6 +67,7 @@ export async function processInput(
     deadlineDate: categoryResult.deadlineDate,
     tags: categoryResult.tags,
     title: formatted.title,
+    subject: formatted.subject,
     formattedContent: formatted.content,
   };
 }

@@ -316,10 +316,21 @@ export default function AttendanceManager() {
             // OR if using legacy response format wrapper, it mimics old structure.
             // Let's assume the GET /daily route maintained legacy structure: { students: [...] }
             if (result.data.students) {
+               // Create a map of Enrollment -> Student ID for lookup
+               const enrollmentToIdMap = new Map<string, string>();
+               students.forEach(s => {
+                   if (s.enrollment) enrollmentToIdMap.set(s.enrollment, s.id);
+                   // Also map ID to ID just in case
+                   enrollmentToIdMap.set(s.id, s.id);
+               });
+
                result.data.students.forEach((studentRecord: any) => {
-                if (loadedAttendance[studentRecord.studentId]) {
+                // Resolve the correct ID (studentRecord.studentId might be enrollment OR id)
+                const targetId = enrollmentToIdMap.get(studentRecord.studentId) || studentRecord.studentId;
+
+                if (loadedAttendance[targetId]) {
                   studentRecord.subjects.forEach((subjectRecord: any) => {
-                    loadedAttendance[studentRecord.studentId][
+                    loadedAttendance[targetId][
                       subjectRecord.subjectName
                     ] = subjectRecord.status;
                   });
@@ -443,6 +454,20 @@ export default function AttendanceManager() {
   const handleSaveAttendance = async () => {
     setIsSaving(true);
     try {
+      // Map attendance from ID keys to Enrollment keys
+      const attendancePayload: Record<string, any> = {};
+      Object.entries(attendance).forEach(([studentId, data]) => {
+        const student = students.find(s => s.id === studentId);
+        if (student && student.enrollment) {
+          attendancePayload[student.enrollment] = data;
+        } else {
+           // Fallback or skip? If enrollment missing, maybe use ID, but likely safer to skip or warn.
+           // For now, let's use ID as fallback but log it.
+           console.warn(`Enrollment missing for student ${studentId}`);
+           attendancePayload[studentId] = data;
+        }
+      });
+
       const response = await fetch("/api/attendance/save-day", {
         method: "POST",
         headers: {
@@ -451,7 +476,7 @@ export default function AttendanceManager() {
         credentials: "include",
         body: JSON.stringify({
           date: format(selectedDate, "yyyy-MM-dd"),
-          attendance: attendance,
+          attendance: attendancePayload,
         }),
       });
 
@@ -630,6 +655,7 @@ export default function AttendanceManager() {
             onMarkAllAbsent={() => currentActiveSubject && markAllAbsent(currentActiveSubject.subject)}
             onNextSubject={handleNextSubject}
             onPrevSubject={handlePrevSubject}
+            onEditSubjects={handleOpenEditSubjects}
             hasNext={currentSubjectIndex < subjectsForDay.length - 1}
             hasPrev={currentSubjectIndex > 0}
             activeTab={activeTab}
@@ -666,7 +692,13 @@ export default function AttendanceManager() {
 
           {activeTab === "timetable" && (
              <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-               <h3 className="font-bold text-lg text-gray-900 px-2">Today's Schedule</h3>
+               <div className="flex items-center justify-between px-2">
+                 <h3 className="font-bold text-lg text-gray-900">Today's Schedule</h3>
+                 <Button size="sm" variant="ghost" onClick={handleOpenEditSubjects} className="text-[#ea580c] hover:text-[#c2410c] hover:bg-orange-50">
+                    <Edit className="h-4 w-4 mr-1" />
+                    Edit
+                 </Button>
+               </div>
                {subjectsForDay.map((subject, idx) => (
                  <div key={idx} className="flex gap-4 p-4 bg-white border border-gray-100 rounded-2xl shadow-sm items-center">
                     <div className={cn("h-16 w-16 rounded-xl bg-gradient-to-br flex items-center justify-center text-white font-bold text-xl shadow-lg", subject.bg && subject.bg.includes("from-") ? subject.bg : "bg-blue-500 from-blue-500 to-blue-600")}>
@@ -724,6 +756,61 @@ export default function AttendanceManager() {
              <div className="w-32 h-1.5 bg-slate-200 rounded-full" />
            </div>
         </div>
+
+      <Dialog open={isEditSubjectsOpen} onOpenChange={setIsEditSubjectsOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto w-[90vw] rounded-xl z-[60]">
+          <DialogHeader>
+            <DialogTitle>Edit Subjects</DialogTitle>
+            <DialogDescription>
+              {format(selectedDate, "PPP")}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            {editingSubjects.map((subject, index) => (
+              <div key={index} className="flex flex-col gap-3 p-3 border rounded-lg bg-gray-50">
+                <div className="grid gap-2 text-sm">
+                  <Label>Time Slot</Label>
+                  <Input 
+                    value={subject.time} 
+                    onChange={(e) => handleSubjectChange(index, "time", e.target.value)}
+                    placeholder="e.g. 10:30 AM"
+                    className="h-9"
+                  />
+                </div>
+                <div className="grid gap-2 text-sm">
+                  <Label>Subject Name</Label>
+                  <Input 
+                    value={subject.subject} 
+                    onChange={(e) => handleSubjectChange(index, "subject", e.target.value)}
+                    placeholder="Subject"
+                    className="h-9"
+                  />
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  className="text-red-500 hover:text-red-700 hover:bg-red-50 self-end"
+                  onClick={() => handleRemoveSubject(index)}
+                >
+                  <Trash2 className="h-4 w-4 mr-1" /> Remove
+                </Button>
+              </div>
+            ))}
+            
+            <Button variant="outline" onClick={handleAddSubject} className="w-full border-dashed h-12">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Subject Slot
+            </Button>
+          </div>
+
+          <DialogFooter className="flex-col gap-2 sm:flex-col">
+             {/* Mobile optimized footer */}
+            <Button className="w-full" onClick={handleSaveSubjects}>Save Changes</Button>
+            <Button variant="outline" className="w-full mt-2 sm:mt-0" onClick={() => setIsEditSubjectsOpen(false)}>Cancel</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       </div>
     );
   }

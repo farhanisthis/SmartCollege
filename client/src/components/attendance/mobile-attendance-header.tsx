@@ -2,7 +2,7 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ChevronLeft, ChevronRight, Bell, User, Calendar as CalendarIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, Bell, User, Calendar as CalendarIcon, Edit } from "lucide-react";
 import { format, addDays, startOfWeek } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -34,6 +34,7 @@ interface MobileAttendanceHeaderProps {
   onPrevDay: () => void;
   onNextDay: () => void;
   onNextSubject: () => void;
+  onEditSubjects?: () => void;
 }
 
 export function MobileAttendanceHeader({
@@ -53,6 +54,7 @@ export function MobileAttendanceHeader({
   onDateSelect,
   onPrevDay,
   onNextDay,
+  onEditSubjects,
 }: MobileAttendanceHeaderProps) {
   // Generate week days for slider
   const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 }); // Monday start
@@ -200,10 +202,22 @@ export function MobileAttendanceHeader({
       </div>
 
       {/* Current Class Card */}
-      <div className="bg-[#3b82f6] rounded-[2.5rem] p-6 text-white shadow-xl shadow-blue-200 relative overflow-hidden">
+      <div className="bg-[#3b82f6] rounded-[2.5rem] p-6 text-white shadow-xl shadow-blue-200 relative overflow-hidden group">
         {/* Background Pattern */}
          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-10 -mt-10" />
          <div className="absolute bottom-0 left-0 w-24 h-24 bg-black/10 rounded-full blur-xl -ml-10 -mb-10" />
+
+         {/* Edit Button */}
+         {onEditSubjects && (
+           <Button
+             size="icon"
+             variant="ghost" 
+             onClick={onEditSubjects}
+             className="absolute top-4 right-4 h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 text-white border-none backdrop-blur-sm z-20"
+           >
+             <Edit className="h-4 w-4" />
+           </Button>
+         )}
 
         <div className="relative z-10">
           <div className="flex items-center justify-between mb-2">

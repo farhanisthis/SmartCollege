@@ -330,22 +330,33 @@ const StudentDashboard: React.FC = () => {
 
   if (isMobile && !activeDetailView) {
     return (
-      <div className="space-y-6 pb-32">
-        <div className="px-4 pt-6">
+      <div className="space-y-4 pb-32">
+        <div className="px-3 pt-4 space-y-3">
           <MobilePerformanceHeader
             stats={{
-              cgpa: 8.4, // Hardcoded for demo/safety as calculated logic might be complex
+              cgpa: 8.4,
               attendance: dashboardData.attendance.percentage || 0,
-              totalCredits: 120, // Placeholder
+              totalCredits: 120,
             }}
           />
+
+          {/* Urgent Alerts - Added for Mobile */}
+          {urgentAssignments.length > 0 && (
+            <Alert className="border-red-200 bg-red-50 rounded-xl py-2 px-3">
+              <AlertCircle className="h-4 w-4 text-red-600" />
+              <AlertDescription className="text-red-800 text-xs font-medium ml-2">
+                <strong>Urgent:</strong> {urgentAssignments.length}{" "}
+                assignment(s) due soon.
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
 
         {/* Grade Trend Chart */}
-        <div className="px-4">
-          <h3 className="font-bold text-lg text-gray-900 mb-4 px-2">Grade Trend</h3>
-          <Card className="rounded-[2rem] border-none shadow-lg shadow-slate-100 pt-6 pr-6 pb-2 pl-0">
-             <div className="h-[200px] w-full">
+        <div className="px-3">
+          <h3 className="font-bold text-base text-gray-900 mb-2 px-1">Grade Trend</h3>
+          <Card className="rounded-2xl border-none shadow-md shadow-slate-100 pt-4 pr-4 pb-0 pl-0">
+             <div className="h-[160px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={dashboardData.monthlyProgress || []}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -353,23 +364,23 @@ const StudentDashboard: React.FC = () => {
                             dataKey="month" 
                             axisLine={false} 
                             tickLine={false} 
-                            tick={{fill: '#94a3b8', fontSize: 12}}
+                            tick={{fill: '#94a3b8', fontSize: 10}}
                         />
                          <YAxis 
                             axisLine={false} 
                             tickLine={false} 
-                            tick={{fill: '#94a3b8', fontSize: 12}}
+                            tick={{fill: '#94a3b8', fontSize: 10}}
                         />
                         <Tooltip 
-                            contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
+                            contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px'}}
                         />
                         <Line
                             type="monotone"
                             dataKey="attendance"
                             stroke="#4f46e5"
-                            strokeWidth={3}
-                            dot={{ fill: "#4f46e5", r: 4, strokeWidth: 2, stroke: "#fff" }}
-                            activeDot={{ r: 6 }}
+                            strokeWidth={2}
+                            dot={{ fill: "#4f46e5", r: 3, strokeWidth: 1, stroke: "#fff" }}
+                            activeDot={{ r: 5 }}
                         />
                     </LineChart>
                 </ResponsiveContainer>
@@ -377,51 +388,147 @@ const StudentDashboard: React.FC = () => {
           </Card>
         </div>
 
+        {/* Recent Pending Activity - Added for Mobile */}
+        <div className="px-3">
+            <h3 className="font-bold text-base text-gray-900 mb-2 px-1">Pending Tasks</h3>
+            {(dashboardData.assignments.pending.length === 0 && (dashboardData.presentations.pending?.length || 0) === 0) ? (
+                 <div className="bg-green-50 p-3 rounded-xl border border-green-100 flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <span className="text-sm font-medium text-green-700">All caught up!</span>
+                 </div>
+            ) : (
+                <div className="space-y-2">
+                   {/* Show top 2 Assignments */}
+                   {dashboardData.assignments.pending.slice(0, 2).map((assignment) => (
+                      <div key={assignment._id} className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm flex flex-col gap-2">
+                          <div className="flex justify-between items-start">
+                             <div className="flex-1 min-w-0 pr-2">
+                                <h4 className="font-bold text-sm text-slate-900 truncate">{assignment.title}</h4>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <Badge variant="outline" className="text-[9px] h-4 px-1">Assign</Badge>
+                                    {assignment.isUrgent && <Badge variant="destructive" className="text-[9px] h-4 px-1">Urgent</Badge>}
+                                </div>
+                             </div>
+                             <Button size="sm" className="h-7 text-xs bg-green-600 hover:bg-green-700 px-3" onClick={() => openSubmissionModal(assignment)}>
+                                Submit
+                             </Button>
+                          </div>
+                      </div>
+                   ))}
+                   {/* Show top 1 Presentation */}
+                   {dashboardData.presentations.pending?.slice(0, 1).map((presentation) => (
+                      <div key={presentation._id} className="bg-purple-50 p-3 rounded-xl border border-purple-100 shadow-sm flex flex-col gap-2">
+                          <div className="flex justify-between items-start">
+                             <div className="flex-1 min-w-0 pr-2">
+                                <h4 className="font-bold text-sm text-purple-900 truncate">{presentation.title}</h4>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <Badge variant="outline" className="text-[9px] h-4 px-1 bg-white text-purple-700 border-purple-200">Pres</Badge>
+                                </div>
+                             </div>
+                             <Button size="sm" className="h-7 text-xs bg-purple-600 hover:bg-purple-700 px-3" onClick={() => openPresentationModal(presentation)}>
+                                Start
+                             </Button>
+                          </div>
+                      </div>
+                   ))}
+                </div>
+            )}
+        </div>
+
+        {/* Quick Actions for assignments/presentations/attendance */}
+        <div className="px-3">
+            <h3 className="font-bold text-base text-gray-900 mb-2 px-1">Quick Actions</h3>
+            <div className="grid grid-cols-3 gap-2">
+                 <Button 
+                    onClick={() => setActiveDetailView("assignments")}
+                    className="h-20 rounded-xl bg-orange-50 hover:bg-orange-100 border border-orange-100 flex flex-col items-center justify-center gap-1 text-orange-700 shadow-sm p-1"
+                    variant="ghost"
+                 >
+                    <BookOpen className="h-5 w-5" />
+                    <span className="font-bold text-[10px]">Assignments</span>
+                 </Button>
+                 <Button 
+                    onClick={() => setActiveDetailView("presentations")}
+                    className="h-20 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-100 flex flex-col items-center justify-center gap-1 text-purple-700 shadow-sm p-1"
+                    variant="ghost"
+                 >
+                    <FileText className="h-5 w-5" />
+                    <span className="font-bold text-[10px]">Presentations</span>
+                 </Button>
+                 <Button 
+                    onClick={() => setIsAttendanceDialogOpen(true)}
+                    className="h-20 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-100 flex flex-col items-center justify-center gap-1 text-blue-700 shadow-sm p-1"
+                    variant="ghost"
+                 >
+                    <Clock className="h-5 w-5" />
+                    <span className="font-bold text-[10px]">Attendance</span>
+                 </Button>
+            </div>
+        </div>
+
         {/* Subject Results List */}
-        <div className="px-4">
-            <h3 className="font-bold text-lg text-gray-900 mb-4 px-2">Recent Results</h3>
-            <div className="space-y-3">
+        <div className="px-3">
+            <h3 className="font-bold text-base text-gray-900 mb-2 px-1">Recent Results</h3>
+            <div className="space-y-2">
                {/* Mocking subject data if not present in dashboardData or valid */}
                {dashboardData.subjectPerformance && dashboardData.subjectPerformance.length > 0 ? (
                  dashboardData.subjectPerformance.map((subject, idx) => (
-                    <div key={idx} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
+                    <div key={idx} className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between">
                         <div>
-                            <h4 className="font-bold text-slate-900">{subject.subject}</h4>
-                            <p className="text-xs text-slate-500 font-medium">Credits: 4</p>
+                            <h4 className="font-bold text-sm text-slate-900">{subject.subject}</h4>
+                            <p className="text-[10px] text-slate-500 font-medium">Credits: 4</p>
                         </div>
                          <div className="flex flex-col items-end">
-                            <span className="text-xl font-black text-indigo-600">{subject.score}%</span>
-                             <span className="text-[10px] font-bold text-green-500 bg-green-50 px-2 py-0.5 rounded-full">
+                            <span className="text-lg font-black text-indigo-600">{subject.score}%</span>
+                             <span className="text-[9px] font-bold text-green-500 bg-green-50 px-1.5 py-0.5 rounded-full">
                                 Pass
                             </span>
                         </div>
                     </div>
                  ))
                ) : (
-                 <div className="text-center py-8 text-gray-400">No recent results found.</div>
+                 <div className="text-center py-6 text-xs text-gray-400">No recent results found.</div>
                )}
             </div>
         </div>
 
-        {/* Quick Actions for assignments/presentations */}
-        <div className="px-4 grid grid-cols-2 gap-3">
-             <Button 
-                onClick={() => setActiveDetailView("assignments")}
-                className="h-24 rounded-2xl bg-orange-50 hover:bg-orange-100 border border-orange-100 flex flex-col items-center justify-center gap-2 text-orange-700 shadow-sm"
-                variant="ghost"
-             >
-                <BookOpen className="h-6 w-6" />
-                <span className="font-bold">Assignments</span>
-             </Button>
-             <Button 
-                onClick={() => setActiveDetailView("presentations")}
-                className="h-24 rounded-2xl bg-purple-50 hover:bg-purple-100 border border-purple-100 flex flex-col items-center justify-center gap-2 text-purple-700 shadow-sm"
-                variant="ghost"
-             >
-                <FileText className="h-6 w-6" />
-                <span className="font-bold">Presentations</span>
-             </Button>
-        </div>
+
+        {/* Submission Modals for Mobile */}
+        {selectedAssignment && (
+          <SubmissionModal
+            item={selectedAssignment}
+            type="assignment"
+            isOpen={isSubmissionModalOpen}
+            onClose={() => setIsSubmissionModalOpen(false)}
+            onSubmit={handleAssignmentSubmit}
+          />
+        )}
+
+        {selectedPresentation && (
+          <SubmissionModal
+            item={selectedPresentation}
+            type="presentation"
+            isOpen={isPresentationModalOpen}
+            onClose={() => setIsPresentationModalOpen(false)}
+            onSubmit={handlePresentationSubmit}
+          />
+        )}
+
+        {/* Attendance Tracker Dialog for Mobile */}
+        <Dialog
+            open={isAttendanceDialogOpen}
+            onOpenChange={setIsAttendanceDialogOpen}
+        >
+            <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto p-4 rounded-xl">
+            <DialogHeader>
+                <DialogTitle>Attendance Tracker</DialogTitle>
+                <DialogDescription>
+                Detailed attendance records
+                </DialogDescription>
+            </DialogHeader>
+            <StudentAttendanceTracker />
+            </DialogContent>
+        </Dialog>
       </div>
     );
   }

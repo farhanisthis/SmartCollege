@@ -118,9 +118,11 @@ export default function StudentAttendanceTracker() {
     > = {};
 
     // Get current user ID from auth context
-    // IMPORTANT: Use rollNumber (enrollment number) to match with attendance records
+    // Get current user ID from auth context
+    // IMPORTANT: Use enrollment number to match with attendance records
     // Database stores attendance with enrollment numbers like "00124402023"
-    const currentUserId = user?.rollNumber || user?.id;
+    // @ts-ignore - enrollment might not be in the strict User type yet
+    const currentUserId = user?.enrollment || user?.rollNumber || user?.id;
 
     console.log("[Attendance Tracker] User info:", {
       userId: user?.id,

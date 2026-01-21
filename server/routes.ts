@@ -514,6 +514,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         const {
           title: processedTitle,
+          subject: processedSubject,
           formattedContent: processedContent,
           category: detectedCategory,
           isUrgent: detectedIsUrgent,
@@ -526,8 +527,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const updateData = {
           title: processedTitle,
           content: processedContent,
+          description: processedContent, // Save AI-generated content as description too
           originalContent: aiInput,
           category: detectedCategory,
+          subject: processedSubject,
           priority: priority || "normal",
           authorId: req.session.userId!,
           isUrgent: detectedIsUrgent,

@@ -366,12 +366,50 @@ ${content}`;
       }
     }
     console.error("AI categorization error:", error, errMsg);
+    console.error("AI categorization error:", error, errMsg);
+    console.log("[AI] Falling back to manual categorization");
+
+    // Manual fallback logic
+    const text = content.toLowerCase();
+    let category: CategoryResult["category"] = "general";
+    let tags: string[] = [];
+
+    if (
+      text.includes("present") || // Covers presentation, presenetatons (if close), presenting
+      text.includes("seminar") ||
+      text.includes("viva") ||
+      text.includes("presen") // Handle specific typo "presenetatons"
+    ) {
+      category = "presentations";
+      tags.push("presentation");
+    } else if (
+      text.includes("assign") || // Covers assignment, assignments
+      text.includes("homework") ||
+      text.includes("project") ||
+      text.includes("submit") ||
+      text.includes("due")
+    ) {
+      category = "assignments";
+      tags.push("assignment");
+    } else if (
+      text.includes("note") ||
+      text.includes("chapter") ||
+      text.includes("unit") ||
+      text.includes("syllabus")
+    ) {
+      category = "notes";
+      tags.push("notes");
+    }
+
+    const manualDeadline = manuallyDetectDeadline(content, new Date());
+
     return {
-      category: "general",
-      confidence: 0.5,
-      isUrgent: false,
-      deadlineDate: undefined,
-      tags: [],
+      category,
+      confidence: 0.6,
+      isUrgent: !!manualDeadline.deadlineDate || !!manualDeadline.dueDate,
+      dueDate: manualDeadline.dueDate,
+      deadlineDate: manualDeadline.deadlineDate,
+      tags,
     };
   }
 }
@@ -766,16 +804,77 @@ ${rawContent}`;
       }
     }
     console.error("AI formatting error:", error, errMsg);
-    // Even in fallback, try to provide a better description than raw content
-    const fallbackDescription =
-      rawContent.length > 100
-        ? rawContent.substring(0, 97) + "..."
-        : rawContent;
+    console.error("AI formatting error:", error, errMsg);
+    console.log("[AI] Falling back to manual formatting");
+
+    // Manual enhancement logic
+    let enhanced = rawContent.trim();
+    // Capitalize first letter
+    enhanced = enhanced.charAt(0).toUpperCase() + enhanced.slice(1);
+    
+    // Fix common typos (heuristic)
+    enhanced = enhanced
+        .replace(/\bbeffore\b/gi, "before")
+        .replace(/\bfebv\b/gi, "Feb")
+        .replace(/\bgonna\b/gi, "going to")
+        .replace(/\bwanna\b/gi, "want to")
+        .replace(/\bur\b/gi, "your")
+        .replace(/\bplz\b/gi, "please")
+        .replace(/\bpresenetatons\b/gi, "Presentations")
+        .replace(/\bpresentation\b/gi, "Presentation"); // Normalize singular
+
+    // Format description
+    let description = `Details:\n• ${enhanced}`;
+    if (detectedCategory.deadlineDate) {
+        description += `\n• Deadline: ${detectedCategory.deadlineDate}`;
+    }
+    if (detectedCategory.dueDate) {
+        description += `\n• Due Date: ${detectedCategory.dueDate}`;
+    }
+
+    // Extract subject/title
+    // Default title is capitalized first few words
+    let title = extractTitleFromContent(enhanced); 
+
+    const lowerContent = enhanced.toLowerCase(); // Use enhanced content which has typos fixed
+    let subject = undefined;
+
+    if (detectedCategory.category === "presentations" || lowerContent.includes("presentation")) {
+        // "presentations of e commerce..." -> "E Commerce Presentation"
+        // Regex: (presentation) (of|on|about) (Subject)
+        const match = lowerContent.match(/presentation(?:s)? (?:of|on|about) (.+?)(?: should| is| by| at|\.|$)/i);
+        if (match) {
+           let subjectText = match[1].trim(); 
+            // cleaning
+           subjectText = subjectText.replace(/\b(assignment|presentation|notes)\b/gi, "").trim();
+           if (subjectText.length > 2) {
+             title = subjectText.charAt(0).toUpperCase() + subjectText.slice(1) + " Presentation";
+             subject = subjectText.charAt(0).toUpperCase() + subjectText.slice(1);
+           }
+        }
+    } else if (detectedCategory.category === "assignments") {
+         // Try to find subject
+        if (lowerContent.includes("web")) subject = "Web Development";
+        else if (lowerContent.includes("dbms") || lowerContent.includes("database")) subject = "Database Management";
+        else if (lowerContent.includes("data structure") || lowerContent.includes("dsa")) subject = "Data Structures";
+        else if (lowerContent.includes("e commerce")) subject = "E-Commerce";
+        
+        if (subject) {
+            title = `${subject} Assignment`;
+        }
+    }
+    
+    // Final title cleanup
+    if (title.length > 50) {
+        title = title.substring(0, 47) + "...";
+    }
+    // Capitalize Title Words
+    title = title.replace(/\w\S*/g, (w) => (w.replace(/^\w/, (c) => c.toUpperCase())));
 
     return {
-      title: extractTitleFromContent(rawContent),
-      subject: undefined, // No subject extracted in fallback
-      content: fallbackDescription,
+      title: title,
+      subject: subject,
+      content: description,
       category: detectedCategory,
     };
   }
