@@ -1,0 +1,14 @@
+
+> smart-college-server@1.0.0 check
+> tsc
+
+routes/attendance.ts(963,13): error TS2451: Cannot redeclare block-scoped variable 'attendanceDate'.
+routes/attendance.ts(1052,13): error TS7034: Variable 'operations' implicitly has type 'any[]' in some locations where its type cannot be determined.
+routes/attendance.ts(1053,13): error TS2451: Cannot redeclare block-scoped variable 'attendanceDate'.
+routes/attendance.ts(1084,43): error TS7005: Variable 'operations' implicitly has an 'any[]' type.
+routes/attendance.ts(1355,13): error TS7034: Variable 'operations' implicitly has type 'any[]' in some locations where its type cannot be determined.
+routes/attendance.ts(1387,43): error TS7005: Variable 'operations' implicitly has an 'any[]' type.
+routes/performance.ts(754,35): error TS2552: Cannot find name 'DailyAttendanceModel'. Did you mean 'dailyAttendance'?
+routes/performance.ts(767,12): error TS7006: Parameter 's' implicitly has an 'any' type.
+routes/performance.ts(772,14): error TS7006: Parameter 's' implicitly has an 'any' type.
+routes/performance.ts(780,14): error TS7006: Parameter 's' implicitly has an 'any' type.

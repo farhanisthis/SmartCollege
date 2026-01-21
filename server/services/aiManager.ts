@@ -3,8 +3,8 @@ import {
   aiConfig,
   type AIProvider,
   type AIResponse,
-} from "../config/aiProviders.ts";
-import { GeminiV1Client } from "./geminiV1Client.ts";
+} from "../config/aiProviders";
+import { GeminiV1Client } from "./geminiV1Client";
 
 class AIProviderManager {
   private geminiInstances: Map<string, GeminiV1Client> = new Map();

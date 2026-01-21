@@ -1,3 +1,3 @@
-import { useAuth as useAuthContext } from '../lib/auth.tsx';
+import { useAuth as useAuthContext } from '../lib/auth';
 
 export const useAuth = useAuthContext;

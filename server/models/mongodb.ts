@@ -1,9 +1,10 @@
 import mongoose, { Schema, Document } from "mongoose";
 
 // User Model
-export interface IUserDocument extends Document {
+export interface IUserDocument extends Omit<Document, "_id"> {
   _id: string;
   username: string;
+  enrollment?: string;
   password: string;
   role: "student" | "cr";
   name: string;
@@ -41,6 +42,7 @@ export interface IUserDocument extends Document {
 const UserSchema = new Schema<IUserDocument>({
   _id: { type: String, required: true },
   username: { type: String, required: true, unique: true },
+  enrollment: { type: String, unique: true, sparse: true }, // Added enrollment number
   password: { type: String, required: true },
   role: { type: String, enum: ["student", "cr"], required: true },
   name: { type: String, required: true },
@@ -80,7 +82,7 @@ const UserSchema = new Schema<IUserDocument>({
 });
 
 // Update Model
-export interface IUpdateDocument extends Document {
+export interface IUpdateDocument extends Omit<Document, "_id"> {
   _id: string;
   title: string;
   content: string;
@@ -130,7 +132,7 @@ const UpdateSchema = new Schema<IUpdateDocument>({
 });
 
 // File Model
-export interface IFileDocument extends Document {
+export interface IFileDocument extends Omit<Document, "_id"> {
   _id: string;
   updateId: string;
   filename: string;
@@ -151,7 +153,7 @@ const FileSchema = new Schema<IFileDocument>({
 });
 
 // User Views Model
-export interface IUserViewDocument extends Document {
+export interface IUserViewDocument extends Omit<Document, "_id"> {
   _id: string;
   userId: string;
   updateId: string;
@@ -166,7 +168,7 @@ const UserViewSchema = new Schema<IUserViewDocument>({
 });
 
 // Assignment Submission Model
-export interface IAssignmentSubmissionDocument extends Document {
+export interface IAssignmentSubmissionDocument extends Omit<Document, "_id"> {
   _id: string;
   updateId: string; // Links to the assignment update
   userId: string; // Student who submitted
@@ -193,96 +195,34 @@ const AssignmentSubmissionSchema = new Schema<IAssignmentSubmissionDocument>({
 // Attendance Model removed (Legacy)
 
 
-// Daily Attendance Sheet Model (New timetable-based system)
-export interface IDailyAttendanceDocument extends Document {
+// Attendance Model (Normalized)
+export interface IAttendanceDocument extends Omit<Document, "_id"> {
   _id: string;
+  studentId: string;
   date: Date;
-  classSection: string; // "E1", "E2", etc.
-  markedBy: string; // CR user ID
-  students: Array<{
-    studentId: string;
-    subjects: Array<{
-      subjectName: string;
-      status: "present" | "absent";
-      timestamp: Date;
-    }>;
-  }>;
+  subject: string;
+  status: "present" | "absent";
+  markedBy: string; // CR
+  classSection: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
-const DailyAttendanceSchema = new Schema<IDailyAttendanceDocument>(
+const AttendanceSchema = new Schema<IAttendanceDocument>(
   {
     _id: { type: String, required: true },
+    studentId: { type: String, required: true },
     date: { type: Date, required: true },
-    classSection: {
+    subject: { type: String, required: true },
+    status: {
       type: String,
+      enum: ["present", "absent"],
       required: true,
-      default: "E1",
-      enum: ["E1", "E2", "E3", "E4"], // Valid class sections
     },
     markedBy: { type: String, required: true },
-    students: [
-      {
-        studentId: {
-          type: String,
-          required: true,
-          validate: {
-            validator: function (v: string) {
-              // Validate that studentId is a reasonable length (student IDs can be numeric)
-              return typeof v === "string" && v.length >= 5 && v.length <= 50;
-            },
-            message:
-              "Student ID must be a valid identifier between 5-50 characters",
-          },
-        },
-        subjects: [
-          {
-            subjectName: {
-              type: String,
-              required: true,
-              enum: [
-                "Computer Graphics",
-                "CG",
-                "CG Lab 4",
-                "Operating Systems",
-                "OS",
-                "Cloud Computing",
-                "CC",
-                "Machine Learning",
-                "ML",
-                "ML Lab 4",
-                "Linux Lab 4",
-              ], // Valid subject names from timetable
-              validate: {
-                validator: function (v: string) {
-                  // Ensure subject name is not just a number
-                  return (
-                    typeof v === "string" && !/^\d+$/.test(v) && v.length > 1
-                  );
-                },
-                message:
-                  "Subject name must be a valid subject identifier, not just numbers",
-              },
-            },
-            status: {
-              type: String,
-              enum: ["present", "absent"],
-              required: true,
-              validate: {
-                validator: function (v: string) {
-                  // Ensure status is not a single character like 'p'
-                  return v === "present" || v === "absent";
-                },
-                message:
-                  'Status must be either "present" or "absent", not abbreviated forms',
-              },
-            },
-            timestamp: { type: Date, default: Date.now },
-          },
-        ],
-      },
-    ],
+    classSection: { type: String, required: true },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now },
   },
   {
     timestamps: true,
@@ -290,7 +230,7 @@ const DailyAttendanceSchema = new Schema<IDailyAttendanceDocument>(
 );
 
 // Presentation Model
-export interface IPresentationDocument extends Document {
+export interface IPresentationDocument extends Omit<Document, "_id"> {
   _id: string;
   updateId: string; // Links to presentation update
   userId: string; // Student presenting
@@ -317,7 +257,7 @@ const PresentationSchema = new Schema<IPresentationDocument>({
 });
 
 // Performance Metrics Model
-export interface IPerformanceMetricsDocument extends Document {
+export interface IPerformanceMetricsDocument extends Omit<Document, "_id"> {
   _id: string;
   userId: string;
   subject?: string;
@@ -347,8 +287,16 @@ AssignmentSubmissionSchema.index({ updateId: 1, userId: 1 }, { unique: true });
 // AttendanceSchema removed
 
 // Create unique compound index for daily attendance sheets
-DailyAttendanceSchema.index({ date: 1, classSection: 1 }, { unique: true });
-DailyAttendanceSchema.index({ markedBy: 1, date: -1 });
+// DailyAttendanceSchema.index({ date: 1, classSection: 1 }, { unique: true }); // Removed
+// DailyAttendanceSchema.index({ markedBy: 1, date: -1 }); // Removed
+
+// Create compound index for easy querying of student attendance
+// AttendanceSchema.index({ studentId: 1, date: 1 }, { unique: true }); // REMOVED: Incorrectly prevents multiple subjects per day
+// Wait, one record per subject per date.
+AttendanceSchema.index({ studentId: 1, date: 1, subject: 1 }, { unique: true });
+AttendanceSchema.index({ classSection: 1, date: 1 }); // For CR view
+AttendanceSchema.index({ markedBy: 1, date: -1 }); 
+
 // Create unique compound index for presentations
 PresentationSchema.index({ updateId: 1, userId: 1 }, { unique: true });
 // Create unique compound index for performance metrics
@@ -369,9 +317,9 @@ export const AssignmentSubmissionModel =
     "AssignmentSubmission",
     AssignmentSubmissionSchema
   );
-export const DailyAttendanceModel = mongoose.model<IDailyAttendanceDocument>(
-  "DailyAttendance",
-  DailyAttendanceSchema
+export const AttendanceModel = mongoose.model<IAttendanceDocument>(
+  "Attendance",
+  AttendanceSchema
 );
 export const PresentationModel = mongoose.model<IPresentationDocument>(
   "Presentation",

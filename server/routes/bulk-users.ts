@@ -2,7 +2,7 @@ import { Router } from "express";
 import mongoose from "mongoose";
 import { 
   UserModel, 
-  DailyAttendanceModel, 
+  AttendanceModel, 
   PerformanceMetricsModel,
   AssignmentSubmissionModel,
   PresentationModel
@@ -46,13 +46,12 @@ router.post("/nuke-db", requireAuth, async (req: any, res: any) => {
             'dashboardalerts', // Legacy
             'performanceconfigs', // Legacy
             
-            // Clean slate for these active tables too?
-
-            // Maybe keep users but clear data?
-            // User asked for "restructure cleanly", possibly implying data wipe.
-            // Let's clear operational data but keep Users to avoid login lockout.
+             // Clean slate for these active tables too?
+             // User asked for "restructure cleanly", possibly implying data wipe.
+             // Let's clear operational data but keep Users to avoid login lockout.
              'assignmentsubmissions',
-             'dailyattendances', 
+             'attendances', // New schema
+             'dailyattendances', // Legacy to be sure
              'presentations',
              'performancemetrics'
         ];
@@ -476,7 +475,7 @@ router.post("/create-e1-students", requireAuth, async (req: any, res: any) => {
           password: hashedPassword,
           role: "student",
           name: student.name,
-          class: `Computer Science - Semester 5 ${student.section}`,
+          class: student.section,
           createdAt: new Date(),
           preferences: {
             notifications: {
@@ -549,7 +548,8 @@ router.post("/fix-cr-data", requireAuth, async (req: any, res: any) => {
     
     // Explicitly set Farhan (or current CR) to E1 if appropriate
     const section = "E1";
-    const newClass = `Computer Science - Semester 5 ${section}`; // Ensure format
+    // Short class name as per new requirement
+    const newClass = section; 
     
     user.class = newClass;
     await user.save();
@@ -587,7 +587,7 @@ router.get("/e1-students", requireAuth, async (req: any, res: any) => {
 
     const students = await UserModel.find(query)
       .select("_id username name email enrollment createdAt class")
-      .sort({ name: 1 });
+      .sort({ enrollment: 1, name: 1 });
 
     res.json({
       success: true,
@@ -647,7 +647,7 @@ router.delete("/reset-e1", requireAuth, async (req: any, res: any) => {
     const presentations = await PresentationModel.deleteMany({ userId: { $in: studentIds } });
     
     // Delete Daily Attendance Sheets for E1
-    const dailySheets = await DailyAttendanceModel.deleteMany({ classSection: "E1" });
+    const dailySheets = await AttendanceModel.deleteMany({ classSection: "E1" });
 
     // 3. Delete Users
     const users = await UserModel.deleteMany({

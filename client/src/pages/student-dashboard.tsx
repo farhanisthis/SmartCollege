@@ -40,6 +40,7 @@ import {
   Bar,
 } from "recharts";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useAuth } from "@/hooks/use-auth";
 import { MobilePerformanceHeader } from "@/components/layout/mobile-performance-header";
 import { getApiUrl } from "@/lib/queryClient";
 
@@ -251,7 +252,9 @@ const StudentDashboard: React.FC = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const response = await fetch(getApiUrl("/api/performance/dashboard"));
+      const response = await fetch(getApiUrl("/api/performance/dashboard"), {
+        credentials: "include",
+      });
 
       if (response.ok) {
         const data = await response.json();

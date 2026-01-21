@@ -5,7 +5,7 @@ import { useWebSocket } from "@/contexts/WebSocketContext";
 import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/layout/header";
 import Sidebar from "@/components/layout/sidebar";
-import MobileBottomNav from "@/components/layout/mobile-bottom-nav";
+
 import MobileCreateFab from "@/components/layout/mobile-create-fab";
 import UpdateCard from "@/components/updates/update-card";
 import PerformanceDashboard from "./performance-dashboard";

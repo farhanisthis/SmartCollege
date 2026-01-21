@@ -10,7 +10,7 @@ import {
   analyzeImage,
   processContentWithFiles,
 } from "./services/ai";
-import { aiManager } from "./services/aiManager.ts";
+import { aiManager } from "./services/aiManager";
 import { processInput } from "./services/inputPipeline";
 import {
   textExtractionService,
@@ -25,6 +25,7 @@ import notificationRoutes from "./routes/notifications";
 import attendanceRoutes from "./routes/attendance";
 import bulkUsersRoutes from "./routes/bulk-users";
 import { generatePerformanceInsight, summarizeText } from "./services/gemini";
+import { compare } from "bcrypt";
 
 // File upload error handler
 const handleUploadError = (
@@ -105,25 +106,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Login route
   app.post("/api/auth/login", async (req, res) => {
     try {
-      const { username, password } = req.body;
+      let { username, password } = req.body;
+      
+      // Trim whitespace to prevent copy-paste errors
+      username = typeof username === 'string' ? username.trim() : username;
+      password = typeof password === 'string' ? password.trim() : password;
+
+      console.log(`[Login Attempt] Username: '${username}'`);
+
       if (!username || !password) {
         return res
           .status(400)
           .json({ message: "Username and password required" });
       }
+      
       // Find user by username
       const user = await storage.getUserByUsername(username);
+      
+      console.log(`[Login Attempt] User found: ${!!user}`);
+      
       if (!user) {
+        console.log(`[Login Attempt] Failed: User not found`);
         return res
           .status(401)
           .json({ message: "Invalid username or password" });
       }
-      // Check password (assume plain text for demo, use hashing in production)
-      if (user.password !== password) {
+      
+      // Check password (support both hashed and legacy plain text)
+      const isMatch = await compare(password, user.password).catch(() => false);
+      
+      if (!isMatch && user.password !== password) {
+        console.log(`[Login Attempt] Failed: Password mismatch for user '${username}'`);
         return res
           .status(401)
           .json({ message: "Invalid username or password" });
       }
+      
+      console.log(`[Login Attempt] Success for user '${username}'`);
+
       // Set session
       req.session.userId = user.id;
       req.session.userRole = user.role;
@@ -134,6 +154,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: user.name,
           role: user.role,
           class: user.class,
+          enrollment: user.enrollment, // Include enrollment
           rollNumber: user.rollNumber, // Include rollNumber for attendance matching
         },
       });

@@ -148,6 +148,25 @@ export class MemStorage implements IStorage {
       preferences: null,
     };
     this.users.set(studentUser.id, studentUser);
+
+    // Create specific student user from issue report
+    const issueStudent: User = {
+      id: "00124402023",
+      username: "00124402023",
+      password: "password",
+      role: "student",
+      name: "Test Student",
+      class: "Computer Science - Semester 5",
+      createdAt: new Date(),
+      phone: null,
+      location: null,
+      bio: null,
+      department: "CS",
+      year: "3",
+      rollNumber: "CS123", // Valid roll number for performance data
+      preferences: null,
+    };
+    this.users.set(issueStudent.id, issueStudent);
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -443,4 +462,6 @@ export class MemStorage implements IStorage {
 }
 
 // Use MongoDB storage for data persistence
+// Use MemStorage for development/testing with seed data
+// export const storage = new MemStorage();
 export const storage = new MongoStorage();

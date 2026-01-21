@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import pLimit from "p-limit";
 import crypto from "crypto";
-import { aiManager } from "./aiManager.ts";
+import { aiManager } from "./aiManager";
 
 // Fallback to direct Gemini if needed
 const apiKey = process.env.GEMINI_KEY_1 || process.env.GOOGLE_API_KEY;
@@ -219,7 +219,7 @@ Current year: ${currentYear}
 
 CATEGORIES:
 - assignments: homework, projects, tasks to be completed by students, assignment submissions
-- notes: lecture notes, study materials, educational content, class notes
+- notes: lecture notes, study materials, educational content, class notes, chapter summaries, unit coverage, exam topics
 - presentations: presentation schedules, seminar announcements, viva notifications, presentation guidelines (includes words like "presentation", "seminar", "viva", "talk")
 - general: announcements, schedule changes, general information
 
@@ -416,11 +416,12 @@ FORMATTING RULES for description:
 - Keep deadlines and general info as paragraphs
 - Format student names: "• Student Name 1\n• Student Name 2"
 - Format requirements: "• Requirement 1\n• Requirement 2"
+- REFINE the text: Fix capitalization, grammar, and punctuation. Make it look professional.
 
 Rules:
 1. Extract the **title** → keep it short, clear (e.g., "Data Structures Assignment", "DBMS Project").
 2. Extract the **subject** → identify from common subjects above.
-3. Extract the **description** → Format with bullet points for lists:
+3. Extract the **description** → Format with bullet points for lists and refine the text for professionalism.
    - Students assigned (if mentioned)
    - Requirements and deliverables
    - Submission details
@@ -433,11 +434,11 @@ Rules:
 }
 
 Example:
-Input: "Assignment for web development. Students: john, mary, david. Requirements: html validation, css responsiveness, javascript interactivity"
+Input: "assignment for web dev. students: john, mary. requirements: html, css."
 Output: {
   "title": "Web Development Assignment",
   "subject": "Web Development",
-  "description": "Students assigned:\n• John\n• Mary\n• David\n\nRequirements:\n• HTML validation\n• CSS responsiveness\n• JavaScript interactivity"
+  "description": "Students assigned:\n• John\n• Mary\n\nRequirements:\n• HTML validation\n• CSS responsiveness"
 }
 
 Content to analyze:
@@ -475,11 +476,12 @@ FORMATTING RULES for description:
 - Use bullet points for examples or case studies
 - Keep explanatory text as paragraphs
 - Format topics: "• Topic 1: Brief explanation\n• Topic 2: Brief explanation"
+- REFINE the text: Fix capitalization, grammar, and punctuation. Make it look professional.
 
 Rules:
 1. Extract the **title** → keep it short, clear (e.g., "Database Normalization Notes", "Algorithm Analysis").
 2. Extract the **subject** → identify from common subjects above.
-3. Extract the **description** → Format with bullet points for lists:
+3. Extract the **description** → Format with bullet points for lists and refine the text for professionalism.
    - Topics covered
    - Key concepts
    - Important formulas/theorems
@@ -491,11 +493,11 @@ Rules:
 }
 
 Example:
-Input: "Database normalization notes covering 1NF, 2NF, 3NF, functional dependencies"
+Input: "dbms normalization notes 1nf 2nf 3nf"
 Output: {
   "title": "Database Normalization Notes", 
   "subject": "Database Management",
-  "description": "Topics covered:\n• 1NF (First Normal Form)\n• 2NF (Second Normal Form)\n• 3NF (Third Normal Form)\n• Functional Dependencies"
+  "description": "Topics covered:\n• 1NF (First Normal Form)\n• 2NF (Second Normal Form)\n• 3NF (Third Normal Form)"
 }
 
 Content to analyze:
@@ -570,11 +572,12 @@ FORMATTING RULES for description:
 - Keep single announcements as paragraphs
 - Format affected groups: "• Group 1\n• Group 2\n• Group 3"
 - Format rules: "• Rule 1\n• Rule 2\n• Rule 3"
+- REFINE the text: Fix capitalization, grammar, and punctuation. Make it look professional.
 
 Rules:
 1. Extract the **title** → keep it short, clear (e.g., "Library Closure", "Attendance Notice").
 2. For **subject** → use "General" as this is a general announcement.
-3. Extract the **description** → Format with bullet points for lists:
+3. Extract the **description** → Format with bullet points for lists and refine the text for professionalism.
    - Lists of affected students/groups
    - Multiple important points
    - Rules or guidelines
@@ -587,11 +590,11 @@ Rules:
 }
 
 Example:
-Input: "Important notice for students: john, mary, david regarding attendance. Must maintain 75% attendance to avoid debarment"
+Input: "important notice for john, mary regarding attendance. must maintain 75%."
 Output: {
   "title": "Attendance Notice",
   "subject": "General",
-  "description": "Important notice for students:\n• John\n• Mary\n• David\n\nMust maintain 75% attendance to avoid debarment from exams."
+  "description": "Important notice for students:\n• John\n• Mary\n\nMust maintain 75% attendance to avoid debarment from exams."
 }
 
 Content to analyze:
@@ -662,11 +665,15 @@ ${rawContent}`;
             }
 
             // Check if description is meaningful (not just original content)
+            // Relaxed check: Only reject if it is EXACTLY the same string (rare due to whitespace/formatting)
+            // AND if the length is significant. For short updates, "identical" might be the best answer.
             if (
-              parsedResult.description.toLowerCase() ===
-              rawContent.toLowerCase()
+              parsedResult.description.trim() === rawContent.trim() &&
+              rawContent.length > 50
             ) {
-              throw new Error("AI description identical to input");
+              console.warn("AI description identical to input (len > 50), but accepting it as best effort.");
+              // Previously we threw an error here, but now we accept it to avoid fallback to raw content
+              // which guarantees no formatting.
             }
 
             const formatResult = {

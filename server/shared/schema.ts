@@ -83,6 +83,24 @@ export const userViews = pgTable("user_views", {
   viewedAt: timestamp("viewed_at").defaultNow(),
 });
 
+export const attendance = pgTable("attendance", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  studentId: varchar("student_id")
+    .notNull()
+    .references(() => users.id),
+  date: timestamp("date").notNull(),
+  subject: text("subject").notNull(),
+  status: text("status").notNull(), // "present", "absent"
+  markedBy: varchar("marked_by")
+    .notNull()
+    .references(() => users.id), // CR ID
+  classSection: text("class_section").notNull(), // "E1", etc.
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -102,6 +120,12 @@ export const insertFileSchema = createInsertSchema(files).omit({
   createdAt: true,
 });
 
+export const insertAttendanceSchema = createInsertSchema(attendance).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const loginSchema = z.object({
   username: z.string().min(1, "Username is required"),
   password: z.string().min(1, "Password is required"),
@@ -118,6 +142,8 @@ export type InsertUpdate = z.infer<typeof insertUpdateSchema>;
 export type Update = typeof updates.$inferSelect;
 export type InsertFile = z.infer<typeof insertFileSchema>;
 export type File = typeof files.$inferSelect;
+export type InsertAttendance = z.infer<typeof insertAttendanceSchema>;
+export type Attendance = typeof attendance.$inferSelect;
 export type Login = z.infer<typeof loginSchema>;
 export type CreateUpdate = z.infer<typeof createUpdateSchema>;
 

@@ -1,0 +1,117 @@
+import { sql } from "drizzle-orm";
+import { pgTable, text, varchar, timestamp, boolean, jsonb, integer, } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
+export const users = pgTable("users", {
+    id: varchar("id")
+        .primaryKey()
+        .default(sql `gen_random_uuid()`),
+    username: text("username").notNull().unique(),
+    password: text("password").notNull(),
+    role: text("role").notNull().default("student"), // "cr" or "student"
+    name: text("name").notNull(),
+    class: text("class").notNull(),
+    createdAt: timestamp("created_at").defaultNow(),
+    // Extended profile fields
+    phone: text("phone"),
+    location: text("location"),
+    bio: text("bio"),
+    department: text("department"),
+    year: text("year"),
+    rollNumber: text("roll_number"),
+    preferences: jsonb("preferences"),
+});
+export const updates = pgTable("updates", {
+    id: varchar("id")
+        .primaryKey()
+        .default(sql `gen_random_uuid()`),
+    title: text("title").notNull(),
+    content: text("content").notNull(),
+    description: text("description"), // AI-generated description
+    originalContent: text("original_content"), // Raw content before AI formatting
+    category: text("category").notNull(), // "assignments", "notes", "presentations", "general"
+    subject: text("subject"), // Subject for grouping (e.g. "Cloud Computing")
+    priority: text("priority").default("normal"), // "normal", "urgent"
+    tags: text("tags").array().default([]), // Additional tags
+    authorId: varchar("author_id")
+        .notNull()
+        .references(() => users.id),
+    isUrgent: boolean("is_urgent").default(false),
+    dueDate: timestamp("due_date"),
+    deadlineDate: timestamp("deadline_date"), // Parsed deadline date for display
+    viewCount: integer("view_count").default(0),
+    downloadCount: integer("download_count").default(0),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+});
+export const files = pgTable("files", {
+    id: varchar("id")
+        .primaryKey()
+        .default(sql `gen_random_uuid()`),
+    updateId: varchar("update_id")
+        .notNull()
+        .references(() => updates.id),
+    filename: text("filename").notNull(),
+    originalName: text("original_name").notNull(),
+    mimeType: text("mime_type").notNull(),
+    size: integer("size").notNull(),
+    path: text("path").notNull(),
+    createdAt: timestamp("created_at").defaultNow(),
+});
+export const userViews = pgTable("user_views", {
+    id: varchar("id")
+        .primaryKey()
+        .default(sql `gen_random_uuid()`),
+    userId: varchar("user_id")
+        .notNull()
+        .references(() => users.id),
+    updateId: varchar("update_id")
+        .notNull()
+        .references(() => updates.id),
+    viewedAt: timestamp("viewed_at").defaultNow(),
+});
+export const attendance = pgTable("attendance", {
+    id: varchar("id")
+        .primaryKey()
+        .default(sql `gen_random_uuid()`),
+    studentId: varchar("student_id")
+        .notNull()
+        .references(() => users.id),
+    date: timestamp("date").notNull(),
+    subject: text("subject").notNull(),
+    status: text("status").notNull(), // "present", "absent"
+    markedBy: varchar("marked_by")
+        .notNull()
+        .references(() => users.id), // CR ID
+    classSection: text("class_section").notNull(), // "E1", etc.
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+});
+// Insert schemas
+export const insertUserSchema = createInsertSchema(users).omit({
+    id: true,
+    createdAt: true,
+});
+export const insertUpdateSchema = createInsertSchema(updates).omit({
+    id: true,
+    viewCount: true,
+    downloadCount: true,
+    createdAt: true,
+    updatedAt: true,
+});
+export const insertFileSchema = createInsertSchema(files).omit({
+    id: true,
+    createdAt: true,
+});
+export const insertAttendanceSchema = createInsertSchema(attendance).omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+});
+export const loginSchema = z.object({
+    username: z.string().min(1, "Username is required"),
+    password: z.string().min(1, "Password is required"),
+});
+export const createUpdateSchema = insertUpdateSchema.extend({
+    files: z.array(z.any()).optional(),
+});

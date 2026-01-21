@@ -5,7 +5,7 @@ import React, {
   useState,
   ReactNode,
 } from "react";
-import { io, Socket } from "socket.io-client";
+import io, { type Socket } from "socket.io-client";
 import type { UpdateWithAuthor } from "@shared/schema";
 
 interface WebSocketContextType {
@@ -46,12 +46,12 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
       setConnected(true);
     });
 
-    newSocket.on("disconnect", (reason) => {
+    newSocket.on("disconnect", (reason: any) => {
       console.log("[WebSocket] Disconnected from server:", reason);
       setConnected(false);
     });
 
-    newSocket.on("connect_error", (error) => {
+    newSocket.on("connect_error", (error: any) => {
       console.error("[WebSocket] Connection error:", error);
       setConnected(false);
     });

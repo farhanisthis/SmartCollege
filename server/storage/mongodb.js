@@ -1,0 +1,756 @@
+import mongoose from "mongoose";
+import { randomUUID } from "crypto";
+import { UserModel, UpdateModel, FileModel, UserViewModel, AssignmentSubmissionModel, AttendanceModel, PresentationModel, PerformanceMetricsModel, } from "../models/mongodb";
+export class MongoStorage {
+    isConnected = false;
+    connectionPromise;
+    constructor() {
+        this.connectionPromise = this.connect();
+    }
+    async connect() {
+        try {
+            const mongoUri = process.env.MONGODB_URI;
+            if (!mongoUri) {
+                throw new Error("MONGODB_URI environment variable is not set");
+            }
+            // MEMORY OPTIMIZED: Reduced connection pool for low-memory environments
+            const options = {
+                serverSelectionTimeoutMS: 10000, // 10 second timeout
+                socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
+                maxPoolSize: 3, // REDUCED: Maintain up to 3 socket connections (was 10)
+                minPoolSize: 1, // Maintain at least 1 socket connection
+                maxIdleTimeMS: 15000, // REDUCED: Close connections after 15 seconds (was 30)
+            };
+            await mongoose.connect(mongoUri, options);
+            // MEMORY OPTIMIZATION: Disable mongoose buffering (this is the correct way)
+            mongoose.set("bufferCommands", false);
+            console.log("Connected to MongoDB successfully");
+            this.isConnected = true;
+            // Initialize sample data if collections are empty
+            // await this.initializeSampleData();
+        }
+        catch (error) {
+            console.error("MongoDB connection error:", error);
+            this.isConnected = false;
+            throw error;
+        }
+    }
+    async ensureConnected() {
+        if (!this.isConnected) {
+            await this.connectionPromise;
+        }
+    }
+    async initializeSampleData() {
+        try {
+            // Check if users exist
+            const userCount = await UserModel.countDocuments();
+            if (userCount === 0) {
+                console.log("Initializing sample data...");
+                // Create sample CR user
+                const crUser = new UserModel({
+                    _id: randomUUID(),
+                    username: "farhanisthis",
+                    password: "123456", // In production, this would be hashed
+                    role: "cr",
+                    name: "Farhan Ali",
+                    class: "Computer Science - Semester 5",
+                    createdAt: new Date(),
+                });
+                await crUser.save();
+                // Create second CR user - Kashish
+                const kashishUser = new UserModel({
+                    _id: randomUUID(),
+                    username: "kashish",
+                    password: "123123", // In production, this would be hashed
+                    role: "cr",
+                    name: "Kashish",
+                    class: "Computer Science - Semester 5",
+                    createdAt: new Date(),
+                });
+                await kashishUser.save();
+                // Create sample student user
+                const studentUser = new UserModel({
+                    _id: randomUUID(),
+                    username: "rohit",
+                    password: "123123",
+                    role: "student",
+                    name: "Rohit",
+                    class: "Computer Science - Semester 5",
+                    createdAt: new Date(),
+                });
+                await studentUser.save();
+                // Initialize sample performance data
+                await this.initializeSamplePerformanceData([crUser._id, kashishUser._id], [studentUser._id]);
+                console.log("Sample data initialized successfully");
+            }
+            else {
+                // Check if Kashish user exists, if not add it
+                const kashishExists = await UserModel.findOne({ username: "kashish" });
+                if (!kashishExists) {
+                    console.log("Adding new CR user: Kashish");
+                    const kashishUser = new UserModel({
+                        _id: randomUUID(),
+                        username: "kashish",
+                        password: "123123", // In production, this would be hashed
+                        role: "cr",
+                        name: "Kashish",
+                        class: "Computer Science - Semester 5",
+                        createdAt: new Date(),
+                    });
+                    await kashishUser.save();
+                    console.log("Kashish user added successfully");
+                }
+                // Always check and create performance data if missing
+                const performanceCount = await PerformanceMetricsModel.countDocuments();
+                if (performanceCount === 0) {
+                    console.log("Initializing missing performance data...");
+                    const crUsers = await UserModel.find({ role: "cr" });
+                    const studentUsers = await UserModel.find({ role: "student" });
+                    if (crUsers.length > 0 && studentUsers.length > 0) {
+                        await this.initializeSamplePerformanceData(crUsers.map((u) => u._id), studentUsers.map((u) => u._id));
+                    }
+                }
+            }
+        }
+        catch (error) {
+            console.error("Error initializing sample data:", error);
+        }
+    }
+    async initializeSamplePerformanceData(crIds, studentIds) {
+        console.log("Initializing sample performance data...");
+        // Create attendance records for the past 30 days
+        const today = new Date();
+        for (let i = 0; i < 30; i++) {
+            const date = new Date(today);
+            date.setDate(date.getDate() - i);
+            for (const studentId of studentIds) {
+                // 85% attendance rate - randomly miss some days
+                const subjects = [
+                    "Mathematics",
+                    "Physics",
+                    "Chemistry",
+                    "English",
+                    "Computer Science",
+                ];
+                for (const subjectName of subjects) {
+                    const isPresent = Math.random() > 0.15;
+                    await AttendanceModel.create({
+                        _id: randomUUID(),
+                        studentId: studentId,
+                        date: date,
+                        subject: subjectName,
+                        status: isPresent ? "present" : "absent",
+                        markedBy: crIds[0],
+                        classSection: "E1",
+                        createdAt: new Date(),
+                        updatedAt: new Date(),
+                    });
+                }
+            }
+        }
+        // Create some sample updates for assignments and presentations
+        const assignments = [
+            {
+                title: "Linear Algebra Problem Set",
+                category: "assignments",
+                subject: "Mathematics",
+                dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Due in 7 days
+            },
+            {
+                title: "Physics Lab Report - Mechanics",
+                category: "assignments",
+                subject: "Physics",
+                dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // Due in 3 days
+            },
+            {
+                title: "Organic Chemistry Assignment",
+                category: "assignments",
+                subject: "Chemistry",
+                dueDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000), // Due in 10 days
+            },
+            {
+                title: "Essay on Modern Literature",
+                category: "assignments",
+                subject: "English",
+                dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // Due in 5 days
+            },
+            {
+                title: "Data Structures Implementation",
+                category: "assignments",
+                subject: "Computer Science",
+                dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // Due in 14 days
+            },
+        ];
+        const presentations = [
+            {
+                title: "Quantum Mechanics Fundamentals",
+                category: "presentations",
+                subject: "Physics",
+            },
+            {
+                title: "Environmental Impact of Technology",
+                category: "presentations",
+                subject: "Computer Science",
+            },
+            {
+                title: "Shakespearean Sonnets Analysis",
+                category: "presentations",
+                subject: "English",
+            },
+        ];
+        const allUpdates = [...assignments, ...presentations];
+        // Create update records for assignments and presentations
+        for (const updateData of allUpdates) {
+            const update = new (await import("../models/mongodb")).UpdateModel({
+                _id: randomUUID(),
+                title: updateData.title,
+                content: `This is ${updateData.category === "assignments"
+                    ? "an assignment"
+                    : "a presentation"} for ${updateData.subject}.`,
+                category: updateData.category,
+                subject: updateData.subject,
+                authorId: crIds[0],
+                createdAt: new Date(Date.now() - Math.random() * 14 * 24 * 60 * 60 * 1000),
+                updatedAt: new Date(),
+            });
+            await update.save();
+            // Create assignment submissions or presentation records for each student
+            for (const studentId of studentIds) {
+                if (updateData.category === "assignments") {
+                    // Only submit 50% of assignments randomly, leaving 50% pending
+                    const shouldSubmit = Math.random() < 0.5;
+                    if (shouldSubmit) {
+                        const scorePercentage = 0.6 + Math.random() * 0.4; // 60-100% score range
+                        const score = Math.round(100 * scorePercentage);
+                        const submission = new AssignmentSubmissionModel({
+                            _id: randomUUID(),
+                            updateId: update._id,
+                            userId: studentId,
+                            submittedAt: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000),
+                            status: Math.random() > 0.1 ? "submitted" : "late",
+                            score,
+                            feedback: score > 80
+                                ? "Excellent work! Well structured and comprehensive."
+                                : score > 60
+                                    ? "Good effort. Some areas need improvement."
+                                    : "Please review the concepts and resubmit if possible.",
+                        });
+                        await submission.save();
+                    }
+                    // If shouldSubmit is false, no submission is created = pending assignment
+                }
+                else {
+                    // Presentation: Only mark 50% as completed, rest as scheduled (pending)
+                    const isCompleted = Math.random() < 0.5;
+                    let status = isCompleted ? "completed" : "scheduled";
+                    let score = undefined;
+                    let feedback = undefined;
+                    if (isCompleted) {
+                        const scorePercentage = 0.65 + Math.random() * 0.35; // 65-100% score range
+                        score = Math.round(100 * scorePercentage);
+                        feedback =
+                            score > 85
+                                ? "Outstanding presentation! Clear delivery and excellent content."
+                                : score > 70
+                                    ? "Good presentation. Work on confidence and eye contact."
+                                    : "Needs improvement in content organization and delivery.";
+                    }
+                    const presentationRecord = new PresentationModel({
+                        _id: randomUUID(),
+                        updateId: update._id,
+                        userId: studentId,
+                        scheduledDate: new Date(Date.now() - Math.random() * 14 * 24 * 60 * 60 * 1000),
+                        status,
+                        score,
+                        feedback,
+                        duration: 15 + Math.floor(Math.random() * 15), // 15-30 minutes
+                    });
+                    await presentationRecord.save();
+                }
+            }
+        }
+        // Create performance metrics for each student
+        for (const studentId of studentIds) {
+            const totalSubjectInstances = await AttendanceModel.countDocuments({
+                studentId: studentId,
+            });
+            const presentSubjectInstances = await AttendanceModel.countDocuments({
+                studentId: studentId,
+                status: "present",
+            });
+            const attendancePercentage = totalSubjectInstances > 0
+                ? (presentSubjectInstances / totalSubjectInstances) * 100
+                : 0;
+            const assignmentSubmissions = await AssignmentSubmissionModel.find({
+                userId: studentId,
+            });
+            const assignmentCompletion = assignmentSubmissions.length > 0
+                ? assignmentSubmissions.reduce((sum, sub) => sum + (sub.score || 0), 0) / assignmentSubmissions.length
+                : 0;
+            const presentationRecords = await PresentationModel.find({
+                userId: studentId,
+            });
+            const presentationScore = presentationRecords.length > 0
+                ? presentationRecords.reduce((sum, pres) => sum + (pres.score || 0), 0) / presentationRecords.length
+                : 0;
+            const overallScore = attendancePercentage * 0.3 +
+                assignmentCompletion * 0.5 +
+                presentationScore * 0.2;
+            const metrics = new PerformanceMetricsModel({
+                _id: randomUUID(),
+                userId: studentId,
+                attendancePercentage: Math.round(attendancePercentage * 10) / 10,
+                assignmentCompletion: Math.round(assignmentCompletion * 10) / 10,
+                presentationScore: Math.round(presentationScore * 10) / 10,
+                overallScore: Math.round(overallScore * 10) / 10,
+                lastUpdated: new Date(),
+            });
+            await metrics.save();
+        }
+        console.log("Sample performance data initialized successfully");
+    }
+    // User methods
+    async getUser(id) {
+        try {
+            await this.ensureConnected();
+            const user = await UserModel.findById(id).lean();
+            return user ? this.mapUserDocument(user) : undefined;
+        }
+        catch (error) {
+            console.error("Error getting user:", error);
+            return undefined;
+        }
+    }
+    async getUserByUsername(username) {
+        try {
+            await this.ensureConnected();
+            const user = await UserModel.findOne({ username }).lean();
+            return user ? this.mapUserDocument(user) : undefined;
+        }
+        catch (error) {
+            console.error("Error getting user by username:", error);
+            return undefined;
+        }
+    }
+    async createUser(insertUser) {
+        try {
+            await this.ensureConnected();
+            const user = new UserModel({
+                _id: randomUUID(),
+                ...insertUser,
+                createdAt: new Date(),
+            });
+            await user.save();
+            return this.mapUserDocument(user.toObject());
+        }
+        catch (error) {
+            console.error("Error creating user:", error);
+            throw error;
+        }
+    }
+    async updateProfile(userId, profileData) {
+        try {
+            await this.ensureConnected();
+            const updatedUser = await UserModel.findByIdAndUpdate(userId, profileData, { new: true }).lean();
+            return updatedUser ? this.mapUserDocument(updatedUser) : undefined;
+        }
+        catch (error) {
+            console.error("Error updating profile:", error);
+            return undefined;
+        }
+    }
+    async updatePreferences(userId, preferences) {
+        try {
+            await this.ensureConnected();
+            const updatedUser = await UserModel.findByIdAndUpdate(userId, { preferences }, { new: true }).lean();
+            return updatedUser ? this.mapUserDocument(updatedUser) : undefined;
+        }
+        catch (error) {
+            console.error("Error updating preferences:", error);
+            return undefined;
+        }
+    }
+    async getUserStats(userId) {
+        try {
+            await this.ensureConnected();
+            // Count completed assignments (submissions by this user)
+            const assignmentsCompleted = await AssignmentSubmissionModel.countDocuments({
+                userId,
+                status: "submitted",
+            });
+            // Count presentations delivered
+            const presentationsDelivered = await PresentationModel.countDocuments({
+                userId,
+                status: "completed",
+            });
+            // Calculate attendance percentage using AttendanceModel
+            const totalSubjectInstances = await AttendanceModel.countDocuments({
+                studentId: userId,
+            });
+            const presentSubjectInstances = await AttendanceModel.countDocuments({
+                studentId: userId,
+                status: "present",
+            });
+            const attendancePercentage = totalSubjectInstances > 0
+                ? Math.round((presentSubjectInstances / totalSubjectInstances) * 100)
+                : 0;
+            return {
+                assignmentsCompleted,
+                presentationsDelivered,
+                attendancePercentage,
+            };
+        }
+        catch (error) {
+            console.error("Error getting user stats:", error);
+            return {
+                assignmentsCompleted: 0,
+                presentationsDelivered: 0,
+                attendancePercentage: 0,
+            };
+        }
+    }
+    // Update methods
+    async getUpdates(filters) {
+        try {
+            await this.ensureConnected();
+            const query = {};
+            if (filters?.category)
+                query.category = filters.category;
+            if (filters?.authorId)
+                query.authorId = filters.authorId;
+            if (filters?.search) {
+                const searchRegex = { $regex: filters.search, $options: "i" };
+                query.$or = [
+                    { title: searchRegex },
+                    { content: searchRegex },
+                    { description: searchRegex }
+                ];
+            }
+            const updates = await UpdateModel.find(query)
+                .sort({ createdAt: -1 })
+                .limit(filters?.limit || 50)
+                .skip(filters?.offset || 0)
+                .lean();
+            // Get authors for all updates
+            const authorIds = Array.from(new Set(updates.map((u) => u.authorId)));
+            const authors = await UserModel.find({ _id: { $in: authorIds } }).lean();
+            const authorMap = new Map(authors.map((a) => [a._id, a]));
+            // Get files for all updates
+            const updateIds = updates.map((u) => u._id);
+            const files = await FileModel.find({
+                updateId: { $in: updateIds },
+            }).lean();
+            const filesMap = new Map();
+            files.forEach((file) => {
+                if (!filesMap.has(file.updateId)) {
+                    filesMap.set(file.updateId, []);
+                }
+                filesMap.get(file.updateId).push(this.mapFileDocument(file));
+            });
+            return updates.map((update) => {
+                const author = authorMap.get(update.authorId);
+                const updateFiles = filesMap.get(update._id) || [];
+                return {
+                    ...this.mapUpdateDocument(update),
+                    author: author
+                        ? {
+                            id: author._id,
+                            name: author.name,
+                            role: author.role,
+                        }
+                        : {
+                            id: update.authorId,
+                            name: "Unknown User",
+                            role: "student",
+                        },
+                    files: updateFiles,
+                };
+            });
+        }
+        catch (error) {
+            console.error("Error getting updates:", error);
+            console.error("Query was:", JSON.stringify(filters || {}));
+            return [];
+        }
+    }
+    async getUpdate(id) {
+        try {
+            await this.ensureConnected();
+            const update = await UpdateModel.findById(id).lean();
+            if (!update)
+                return undefined;
+            const author = await UserModel.findById(update.authorId).lean();
+            const files = await FileModel.find({ updateId: id }).lean();
+            return {
+                ...this.mapUpdateDocument(update),
+                author: author
+                    ? {
+                        id: author._id,
+                        name: author.name,
+                        role: author.role,
+                    }
+                    : {
+                        id: update.authorId,
+                        name: "Unknown User",
+                        role: "student",
+                    },
+                files: files.map((f) => this.mapFileDocument(f)),
+            };
+        }
+        catch (error) {
+            console.error("Error getting update:", error);
+            return undefined;
+        }
+    }
+    async createUpdate(insertUpdate) {
+        try {
+            await this.ensureConnected();
+            const update = new UpdateModel({
+                _id: randomUUID(),
+                ...insertUpdate,
+                createdAt: new Date(),
+                viewCount: 0,
+                downloadCount: 0,
+            });
+            await update.save();
+            return this.mapUpdateDocument(update.toObject());
+        }
+        catch (error) {
+            console.error("Error creating update:", error);
+            throw error;
+        }
+    }
+    async updateUpdate(id, updateData) {
+        try {
+            await this.ensureConnected();
+            const updated = await UpdateModel.findByIdAndUpdate(id, updateData, {
+                new: true,
+            }).lean();
+            return updated ? this.mapUpdateDocument(updated) : undefined;
+        }
+        catch (error) {
+            console.error("Error updating update:", error);
+            return undefined;
+        }
+    }
+    async updateDescription(id, description) {
+        try {
+            const result = await UpdateModel.findByIdAndUpdate(id, { description, updatedAt: new Date() }, { new: true });
+            return !!result;
+        }
+        catch (error) {
+            console.error("Error updating description:", error);
+            return false;
+        }
+    }
+    async deleteUpdate(id) {
+        try {
+            // Delete associated files first
+            await FileModel.deleteMany({ updateId: id });
+            // Delete user views
+            await UserViewModel.deleteMany({ updateId: id });
+            // Delete the update
+            const result = await UpdateModel.findByIdAndDelete(id);
+            return !!result;
+        }
+        catch (error) {
+            console.error("Error deleting update:", error);
+            return false;
+        }
+    }
+    async incrementViewCount(id) {
+        try {
+            await UpdateModel.findByIdAndUpdate(id, { $inc: { viewCount: 1 } });
+        }
+        catch (error) {
+            console.error("Error incrementing view count:", error);
+        }
+    }
+    async incrementDownloadCount(id) {
+        try {
+            await UpdateModel.findByIdAndUpdate(id, { $inc: { downloadCount: 1 } });
+        }
+        catch (error) {
+            console.error("Error incrementing download count:", error);
+        }
+    }
+    // File methods
+    async createFile(insertFile) {
+        try {
+            const file = new FileModel({
+                _id: randomUUID(),
+                ...insertFile,
+                createdAt: new Date(),
+            });
+            await file.save();
+            return this.mapFileDocument(file.toObject());
+        }
+        catch (error) {
+            console.error("Error creating file:", error);
+            throw error;
+        }
+    }
+    async getFilesByUpdateId(updateId) {
+        try {
+            const files = await FileModel.find({ updateId }).lean();
+            return files.map((f) => this.mapFileDocument(f));
+        }
+        catch (error) {
+            console.error("Error getting files by update ID:", error);
+            return [];
+        }
+    }
+    async getAllFiles() {
+        try {
+            const files = await FileModel.find().lean();
+            return files.map((f) => this.mapFileDocument(f));
+        }
+        catch (error) {
+            console.error("Error getting all files:", error);
+            return [];
+        }
+    }
+    async getFile(id) {
+        try {
+            const file = await FileModel.findById(id).lean();
+            return file ? this.mapFileDocument(file) : undefined;
+        }
+        catch (error) {
+            console.error("Error getting file:", error);
+            return undefined;
+        }
+    }
+    async deleteFile(id) {
+        try {
+            const result = await FileModel.findByIdAndDelete(id);
+            return !!result;
+        }
+        catch (error) {
+            console.error("Error deleting file:", error);
+            return false;
+        }
+    }
+    // Stats methods
+    async getDashboardStats() {
+        try {
+            const totalUpdates = await UpdateModel.countDocuments();
+            // Get updates from this week
+            const oneWeekAgo = new Date();
+            oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+            const thisWeek = await UpdateModel.countDocuments({
+                createdAt: { $gte: oneWeekAgo },
+            });
+            // Get category counts
+            const categoryCounts = await UpdateModel.aggregate([
+                { $group: { _id: "$category", count: { $sum: 1 } } },
+            ]);
+            const counts = {
+                all: totalUpdates,
+                assignments: 0,
+                notes: 0,
+                presentations: 0,
+                general: 0,
+            };
+            categoryCounts.forEach((item) => {
+                if (item._id in counts) {
+                    counts[item._id] = item.count;
+                }
+            });
+            return {
+                totalUpdates,
+                thisWeek,
+                counts,
+            };
+        }
+        catch (error) {
+            console.error("Error getting dashboard stats:", error);
+            return {
+                totalUpdates: 0,
+                thisWeek: 0,
+                counts: {
+                    all: 0,
+                    assignments: 0,
+                    notes: 0,
+                    presentations: 0,
+                    general: 0,
+                },
+            };
+        }
+    }
+    // User views methods
+    async markAsViewed(userId, updateId) {
+        try {
+            await UserViewModel.findOneAndUpdate({ userId, updateId }, {
+                _id: randomUUID(),
+                userId,
+                updateId,
+                viewedAt: new Date(),
+            }, { upsert: true });
+        }
+        catch (error) {
+            console.error("Error marking as viewed:", error);
+        }
+    }
+    async hasUserViewed(userId, updateId) {
+        try {
+            const view = await UserViewModel.findOne({ userId, updateId });
+            return !!view;
+        }
+        catch (error) {
+            console.error("Error checking if user viewed:", error);
+            return false;
+        }
+    }
+    // Helper methods to map MongoDB documents to application types
+    mapUserDocument(doc) {
+        return {
+            id: doc._id,
+            username: doc.username,
+            password: doc.password,
+            role: doc.role,
+            name: doc.name,
+            class: doc.class,
+            createdAt: doc.createdAt,
+            phone: doc.phone,
+            location: doc.location,
+            bio: doc.bio,
+            department: doc.department,
+            year: doc.year,
+            rollNumber: doc.rollNumber,
+            preferences: doc.preferences,
+        };
+    }
+    mapUpdateDocument(doc) {
+        return {
+            id: doc._id,
+            title: doc.title,
+            content: doc.content,
+            description: doc.description,
+            originalContent: doc.originalContent,
+            category: doc.category,
+            subject: doc.subject,
+            priority: doc.priority,
+            tags: doc.tags,
+            authorId: doc.authorId,
+            isUrgent: doc.isUrgent,
+            dueDate: doc.dueDate,
+            deadlineDate: doc.deadlineDate,
+            viewCount: doc.viewCount,
+            downloadCount: doc.downloadCount,
+            createdAt: doc.createdAt,
+            updatedAt: doc.updatedAt,
+        };
+    }
+    mapFileDocument(doc) {
+        return {
+            id: doc._id,
+            updateId: doc.updateId,
+            filename: doc.filename,
+            originalName: doc.originalName,
+            mimeType: doc.mimeType,
+            size: doc.size,
+            path: doc.path,
+            createdAt: doc.createdAt,
+        };
+    }
+}

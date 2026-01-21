@@ -1,7 +1,7 @@
 import { Router } from "express";
 import {
   AssignmentSubmissionModel,
-  DailyAttendanceModel,
+  AttendanceModel,
   PresentationModel,
   PerformanceMetricsModel,
   UpdateModel,
@@ -31,7 +31,9 @@ const requireAuth = async (req: any, res: any, next: any) => {
          userId: user.id,
          role: user.role,
          username: user.username,
-         class: user.class
+         class: user.class,
+         enrollment: user.enrollment, // Added enrollment
+         rollNumber: user.rollNumber  // Added rollNumber
      };
      next();
   } catch (err) {
@@ -43,15 +45,12 @@ const requireAuth = async (req: any, res: any, next: any) => {
 // Calculate performance metrics for a user
 // @param userId - Should be the student's rollNumber (enrollment number) for attendance matching
 async function calculatePerformanceMetrics(userId: string, section: string, subject?: string) {
-  const filter = subject ? { subject } : {};
-
-  // Attendance percentage using DailyAttendanceModel
+  // Attendance percentage using AttendanceModel
   let totalAttendanceCount = 0;
   let presentCount = 0;
 
   if (!section) {
       console.warn("No section provided for metrics calculation");
-      // Return zeroed metrics or handle as error? For now, return safe defaults.
       return {
         attendancePercentage: 0,
         assignmentCompletion: 0,
@@ -60,32 +59,17 @@ async function calculatePerformanceMetrics(userId: string, section: string, subj
       };
   }
 
-  // Get all daily attendance records for the specific section
-  const dailyAttendanceRecords = await DailyAttendanceModel.find({
-    classSection: section, // DYNAMIC SECTION
+  // Count total attendance records for this student (and subject if provided)
+  totalAttendanceCount = await AttendanceModel.countDocuments({
+    studentId: userId,
+    ...(subject ? { subject } : {})
   });
 
-  // Calculate attendance from daily records
-  // Note: studentId in attendance records is the rollNumber, not UUID
-  dailyAttendanceRecords.forEach((record) => {
-    const studentRecord = record.students.find((s) => s.studentId === userId);
-
-    if (studentRecord) {
-      studentRecord.subjects.forEach((subjectRecord) => {
-        // If filtering by subject, only count matching subjects
-        if (!subject || subjectRecord.subjectName === subject) {
-          totalAttendanceCount++;
-          // Handle both correct format ("present"/"absent") and corrupted format (individual characters)
-          // If status is "present" or single character "p", count as present
-          if (
-            subjectRecord.status === "present" ||
-            (subjectRecord.status as string) === "p"
-          ) {
-            presentCount++;
-          }
-        }
-      });
-    }
+  // Count present records
+  presentCount = await AttendanceModel.countDocuments({
+    studentId: userId,
+    status: "present",
+    ...(subject ? { subject } : {})
   });
 
   const attendancePercentage =
@@ -205,7 +189,7 @@ router.get("/metrics", requireAuth, async (req: any, res: any) => {
     // Get user's rollNumber for attendance matching
     // req.user is populated by requireAuth now
     const user = req.user;
-    const rollNumber = user?.rollNumber || userId; // Fallback to userId if rollNumber not set
+    const rollNumber = user?.enrollment || user?.rollNumber || userId; // Use enrollment first
     const section = getSection(user?.class || "");
 
     console.log(
@@ -259,7 +243,7 @@ router.get("/dashboard", requireAuth, async (req: any, res: any) => {
 
     // Run all major queries in parallel instead of sequentially
     const [
-      recentDailyRecords,
+      recentAttendanceRecords,
       allAssignments,
       allPresentationUpdates,
       userSubmissions,
@@ -267,14 +251,12 @@ router.get("/dashboard", requireAuth, async (req: any, res: any) => {
       allUserPresentations,
     ] = await Promise.all([
       // Recent attendance (optimized with projection) - use rollNumber for matching
-      DailyAttendanceModel.find({
-        classSection: section, // DYNAMIC SECTION
-        date: { $gte: thirtyDaysAgo },
-        "students.studentId": rollNumber, // Use rollNumber instead of userId
+      AttendanceModel.find({
+        studentId: rollNumber,
+        date: { $gte: thirtyDaysAgo }
       })
-        .select("date students.studentId students.subjects markedBy")
         .sort({ date: -1 })
-        .limit(10)
+        .limit(20) // Limit to 20 subject records
         .lean(),
 
       // All assignments (with projection to reduce data transfer)
@@ -319,38 +301,19 @@ router.get("/dashboard", requireAuth, async (req: any, res: any) => {
     console.time("Transform Attendance Data");
 
     // Transform daily attendance records (optimized processing) - use rollNumber for matching
-    const recentAttendance: any[] = [];
-    recentDailyRecords.forEach((dailyRecord) => {
-      const studentRecord = dailyRecord.students?.find(
-        (s) => s.studentId === rollNumber // Use rollNumber instead of userId
-      );
+    const recentAttendance: any[] = recentAttendanceRecords.map((record: any) => ({
+      _id: record._id,
+      userId,
+      date: record.date,
+      status: record.status,
+      subject: record.subject,
+      markedBy: record.markedBy,
+      markedAt: record.createdAt,
+    }));
 
-      if (studentRecord) {
-        studentRecord.subjects?.forEach((subjectRecord) => {
-          // If filtering by subject, only include matching subjects
-          if (!subject || subjectRecord.subjectName === subject) {
-            // Normalize status: treat "p" as "present" and others as "absent"
-            const normalizedStatus =
-              (subjectRecord.status as string) === "p" ||
-              subjectRecord.status === "present"
-                ? "present"
-                : "absent";
-
-            recentAttendance.push({
-              _id: `${dailyRecord._id}-${subjectRecord.subjectName}`,
-              userId,
-              date: dailyRecord.date,
-              status: normalizedStatus,
-              subject: subjectRecord.subjectName,
-              markedBy: dailyRecord.markedBy,
-              markedAt: subjectRecord.timestamp,
-            });
-          }
-        });
-      }
-    });
-
-    // Sort by date descending and limit to 10 (already done by DB query, but ensure)
+    // Sort by date descending and limit to 10 (already done by DB query but ensure)
+    // Actually limit to 10 distinct days or 10 records? Dashboard usually shows list of recent subject classes.
+    // Let's keep 10 latest subject attendances.
     recentAttendance.sort(
       (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
     );
@@ -486,15 +449,8 @@ router.get("/dashboard", requireAuth, async (req: any, res: any) => {
     });
 
     // Process attendance (from already fetched recent records)
-    recentDailyRecords.forEach((record) => {
-      const studentRecord = record.students?.find(
-        (s) => s.studentId === rollNumber // Use rollNumber instead of userId
-      );
-      if (
-        studentRecord?.subjects?.some(
-          (s) => s.status === "present" || (s.status as any) === "p"
-        )
-      ) {
+    recentAttendanceRecords.forEach((record: any) => {
+      if (record.status === "present") {
         const dateKey = new Date(record.date).toDateString();
         activitiesByDate.set(dateKey, true);
       }
@@ -747,57 +703,30 @@ router.post("/attendance", requireAuth, async (req: any, res: any) => {
       return res.status(403).json({ error: "Access denied" });
     }
 
+    // Mark attendance (for CRs) - Updated to use AttendanceModel
     const attendanceDate = new Date(date);
 
-    // Find or create daily attendance record
-    let dailyAttendance = await DailyAttendanceModel.findOne({
-      date: attendanceDate,
-      classSection: "E1",
-    });
-
-    if (!dailyAttendance) {
-      // Create new daily attendance record
-      dailyAttendance = new DailyAttendanceModel({
-        _id: nanoid(),
-        date: attendanceDate,
-        classSection: "E1",
-        markedBy: crId,
-        students: [],
-      });
-    }
-
-    // Find or create student record in daily attendance
-    let studentRecord = dailyAttendance.students.find(
-      (s) => s.studentId === targetUserId
-    );
-
-    if (!studentRecord) {
-      studentRecord = {
+    // Update or create attendance record
+    await AttendanceModel.findOneAndUpdate(
+      {
         studentId: targetUserId,
-        subjects: [],
-      };
-      dailyAttendance.students.push(studentRecord);
-    }
-
-    // Find or create subject record
-    let subjectRecord = studentRecord.subjects.find(
-      (s) => s.subjectName === subject
+        date: attendanceDate,
+        subject: subject
+      },
+      {
+        $setOnInsert: {
+          _id: nanoid(),
+          classSection: "E1", // Default to E1 if not provided (legacy route)
+          createdAt: new Date()
+        },
+        $set: {
+           status: status,
+           markedBy: crId,
+           updatedAt: new Date()
+        }
+      },
+      { upsert: true }
     );
-
-    if (subjectRecord) {
-      // Update existing subject attendance
-      subjectRecord.status = status;
-      subjectRecord.timestamp = new Date();
-    } else {
-      // Add new subject attendance
-      studentRecord.subjects.push({
-        subjectName: subject,
-        status: status,
-        timestamp: new Date(),
-      });
-    }
-
-    await dailyAttendance.save();
     res.json({ message: "Attendance marked successfully" });
   } catch (error) {
     console.error("Error marking attendance:", error);
@@ -824,37 +753,36 @@ router.get("/attendance/class", requireAuth, async (req: any, res: any) => {
     });
 
     // Get daily attendance record for the specified date
-    const dailyAttendance = await DailyAttendanceModel.findOne({
+
+    // Get attendance records for the specified date
+    const query: any = {
       date: new Date(date as string),
-      classSection: "E1",
-    });
+    };
+    if (subject) {
+      query.subject = subject;
+    }
+
+    const attendanceRecords = await AttendanceModel.find(query);
 
     const attendanceData = [];
     for (const student of students) {
       let status = "not_marked";
-
-      if (dailyAttendance) {
-        // Use rollNumber for matching, fallback to _id if rollNumber not set
-        const studentIdentifier = student.rollNumber || student._id;
-        const studentRecord = dailyAttendance.students.find(
-          (s) => s.studentId === studentIdentifier
-        );
-
-        if (studentRecord && subject) {
-          const subjectRecord = studentRecord.subjects.find(
-            (s) => s.subjectName === subject
-          );
-          if (subjectRecord) {
-            status = subjectRecord.status;
+      
+      const studentIdentifier = student.rollNumber || student._id;
+      
+      // Find records for this student
+      const studentRecords = attendanceRecords.filter(r => r.studentId === studentIdentifier);
+      
+      if (studentRecords.length > 0) {
+          if (subject) {
+             // Should be only one record if subject is specified
+             status = studentRecords[0].status;
+          } else {
+             // Aggregate status from multiple subjects
+             const presentCount = studentRecords.filter(r => r.status === "present").length;
+             const totalCount = studentRecords.length;
+             status = presentCount > totalCount / 2 ? "present" : "absent";
           }
-        } else if (studentRecord && !subject) {
-          // If no specific subject, show overall status
-          const presentCount = studentRecord.subjects.filter(
-            (s) => s.status === "present"
-          ).length;
-          const totalCount = studentRecord.subjects.length;
-          status = presentCount > totalCount / 2 ? "present" : "absent";
-        }
       }
 
       attendanceData.push({
@@ -867,7 +795,7 @@ router.get("/attendance/class", requireAuth, async (req: any, res: any) => {
         status: status,
       });
     }
-
+    
     res.json(attendanceData);
   } catch (error) {
     console.error("Error fetching class attendance:", error);

@@ -1,0 +1,8 @@
+src/contexts/WebSocketContext.tsx(1,8): error TS1259: Module '"D:/Exp/SmartCollege/client/node_modules/@types/react/index"' can only be default-imported using the 'esModuleInterop' flag
+src/contexts/WebSocketContext.tsx(8,8): error TS1259: Module '"socket.io-client"' can only be default-imported using the 'esModuleInterop' flag
+src/contexts/WebSocketContext.tsx(9,39): error TS2307: Cannot find module '@shared/schema' or its corresponding type declarations.
+src/contexts/WebSocketContext.tsx(12,11): error TS2749: 'Socket' refers to a value, but is being used as a type here. Did you mean 'typeof Socket'?
+src/contexts/WebSocketContext.tsx(28,40): error TS2749: 'Socket' refers to a value, but is being used as a type here. Did you mean 'typeof Socket'?
+src/contexts/WebSocketContext.tsx(34,7): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/contexts/WebSocketContext.tsx(34,19): error TS2339: Property 'env' does not exist on type 'ImportMeta'.
+src/contexts/WebSocketContext.tsx(136,5): error TS17004: Cannot use JSX unless the '--jsx' flag is provided.

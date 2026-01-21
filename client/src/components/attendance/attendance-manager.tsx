@@ -24,6 +24,17 @@ import { MobileAttendanceHeader } from "./mobile-attendance-header";
 import { MobileStudentRow } from "./mobile-student-row";
 import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "../ui/dialog";
+import { Label } from "../ui/label";
+import { Edit, Plus, Trash2 } from "lucide-react";
 
 // E1 Timetable Data
 const E1Schedule = {
@@ -117,345 +128,12 @@ const E1Schedule = {
   },
 };
 
-// Real E1 Students Data
-const E1Students = [
-  {
-    id: "00124402023",
-    name: "Mohammad Asad",
-    email: "mohammadasad@example.com",
-    enrollment: "00124402023",
-  },
-  {
-    id: "00224402023",
-    name: "Shiven Sharma",
-    email: "shivensharma@example.com",
-    enrollment: "00224402023",
-  },
-  {
-    id: "00324402023",
-    name: "Shivam Vij",
-    email: "shivamvij@example.com",
-    enrollment: "00324402023",
-  },
-  {
-    id: "00424402023",
-    name: "TANYA SINHA",
-    email: "tanyasinha@example.com",
-    enrollment: "00424402023",
-  },
-  {
-    id: "00524402023",
-    name: "Madhav Wadhwa",
-    email: "madhavwadhwa@example.com",
-    enrollment: "00524402023",
-  },
-  {
-    id: "00624402023",
-    name: "POSHIKA PAL",
-    email: "poshikapal@example.com",
-    enrollment: "00624402023",
-  },
-  {
-    id: "00724402023",
-    name: "Ranveer Singh",
-    email: "ranveersingh@example.com",
-    enrollment: "00724402023",
-  },
-  {
-    id: "00824402023",
-    name: "Devang bisht",
-    email: "devangbisht@example.com",
-    enrollment: "00824402023",
-  },
-  {
-    id: "00924402023",
-    name: "Vaibhav Kumar",
-    email: "vaibhavkumar@example.com",
-    enrollment: "00924402023",
-  },
-  {
-    id: "01024402023",
-    name: "Kkavya Sahni",
-    email: "kkavyasahni@example.com",
-    enrollment: "01024402023",
-  },
-  {
-    id: "01124402023",
-    name: "DEEPALI JAIN",
-    email: "deepalijain@example.com",
-    enrollment: "01124402023",
-  },
-  {
-    id: "01224402023",
-    name: "HARSH MAGGO",
-    email: "harshmaggo@example.com",
-    enrollment: "01224402023",
-  },
-  {
-    id: "01324402023",
-    name: "Vibhuti Panwar",
-    email: "vibhutipanwar@example.com",
-    enrollment: "01324402023",
-  },
-  {
-    id: "01424402023",
-    name: "Aryan verma",
-    email: "aryanverma@example.com",
-    enrollment: "01424402023",
-  },
-  {
-    id: "01524402023",
-    name: "Jai Malik",
-    email: "jaimalik@example.com",
-    enrollment: "01524402023",
-  },
-  {
-    id: "01624402023",
-    name: "NIHARIKA SHARMA",
-    email: "niharikasharma@example.com",
-    enrollment: "01624402023",
-  },
-  {
-    id: "01724402023",
-    name: "Siddharth Shrestha",
-    email: "siddharthshrestha@example.com",
-    enrollment: "01724402023",
-  },
-  {
-    id: "01824402023",
-    name: "ARYAN THAKUR",
-    email: "aryanthakur@example.com",
-    enrollment: "01824402023",
-  },
-  {
-    id: "01924402023",
-    name: "Aditya Kant Pathak",
-    email: "adityakantpathak@example.com",
-    enrollment: "01924402023",
-  },
-  {
-    id: "02024402023",
-    name: "Gursaibh Singh",
-    email: "gursaibhsingh@example.com",
-    enrollment: "02024402023",
-  },
-  {
-    id: "02124402023",
-    name: "brahmjot singh",
-    email: "brahmjotsingh@example.com",
-    enrollment: "02124402023",
-  },
-  {
-    id: "02224402023",
-    name: "HARSHITA SALUJA",
-    email: "harshitasaluja@example.com",
-    enrollment: "02224402023",
-  },
-  {
-    id: "02324402023",
-    name: "Sanskriti Singhal",
-    email: "sanskritisinghal@example.com",
-    enrollment: "02324402023",
-  },
-  {
-    id: "02424402023",
-    name: "SANDEEP KUMAR",
-    email: "sandeepkumar@example.com",
-    enrollment: "02424402023",
-  },
-  {
-    id: "02524402023",
-    name: "Vishnu Narayan Khanna",
-    email: "vishnunarayankhanna@example.com",
-    enrollment: "02524402023",
-  },
-  {
-    id: "02624402023",
-    name: "VAJIPAYAJULA ADITYA",
-    email: "vajipayajulaaditya@example.com",
-    enrollment: "02624402023",
-  },
-  {
-    id: "02724402023",
-    name: "Akshita",
-    email: "akshita@example.com",
-    enrollment: "02724402023",
-  },
-  {
-    id: "02824402023",
-    name: "Mishti sehgal",
-    email: "mishtisehgal@example.com",
-    enrollment: "02824402023",
-  },
-  {
-    id: "02924402023",
-    name: "TWINKLE SHARMA",
-    email: "twinklesharma@example.com",
-    enrollment: "02924402023",
-  },
-  {
-    id: "03024402023",
-    name: "DHRUV SHARMA",
-    email: "dhruvsharma@example.com",
-    enrollment: "03024402023",
-  },
-  {
-    id: "03124402023",
-    name: "Saif Siddiqui",
-    email: "saifsiddiqui@example.com",
-    enrollment: "03124402023",
-  },
-  {
-    id: "03224402023",
-    name: "Aman kumar",
-    email: "amankumar@example.com",
-    enrollment: "03224402023",
-  },
-  {
-    id: "03324402023",
-    name: "Muskan sharma",
-    email: "muskansharma@example.com",
-    enrollment: "03324402023",
-  },
-  {
-    id: "03424402023",
-    name: "Vansh Khatri",
-    email: "vanshkhatri@example.com",
-    enrollment: "03424402023",
-  },
-  {
-    id: "03524402023",
-    name: "Pansul Saxena",
-    email: "pansulsaxena@example.com",
-    enrollment: "03524402023",
-  },
-  {
-    id: "03624402023",
-    name: "Niyati Mittal",
-    email: "niyatimittal@example.com",
-    enrollment: "03624402023",
-  },
-  {
-    id: "03724402023",
-    name: "Jiya Basra",
-    email: "jiyabasra@example.com",
-    enrollment: "03724402023",
-  },
-  {
-    id: "03824402023",
-    name: "Aditya S. Bhandari",
-    email: "adityas.bhandari@example.com",
-    enrollment: "03824402023",
-  },
-  {
-    id: "03924402023",
-    name: "Krish Aggarwal",
-    email: "krishaggarwal@example.com",
-    enrollment: "03924402023",
-  },
-  {
-    id: "04024402023",
-    name: "Mohit Kumar Rawat",
-    email: "mohitkumarrawat@example.com",
-    enrollment: "04024402023",
-  },
-  {
-    id: "04124402023",
-    name: "Sunveen Kaur",
-    email: "sunveenkaur@example.com",
-    enrollment: "04124402023",
-  },
-  {
-    id: "04224402023",
-    name: "Priyanshu Shekhar Singh",
-    email: "priyanshushekharsingh@example.com",
-    enrollment: "04224402023",
-  },
-  {
-    id: "04324402023",
-    name: "Manas Sharma",
-    email: "manassharma@example.com",
-    enrollment: "04324402023",
-  },
-  {
-    id: "04424402023",
-    name: "Muskan Thapa",
-    email: "muskanthapa@example.com",
-    enrollment: "04424402023",
-  },
-  {
-    id: "04524402023",
-    name: "SHIVAN TIWARI",
-    email: "shivantiwari@example.com",
-    enrollment: "04524402023",
-  },
-  {
-    id: "04624402023",
-    name: "Megha Chakraborty",
-    email: "meghachakraborty@example.com",
-    enrollment: "04624402023",
-  },
-  {
-    id: "04724402023",
-    name: "Aryan Bhardwaj",
-    email: "aryanbhardwaj@example.com",
-    enrollment: "04724402023",
-  },
-  {
-    id: "04824402023",
-    name: "Manish Nainwal",
-    email: "manishnainwal@example.com",
-    enrollment: "04824402023",
-  },
-  {
-    id: "04924402023",
-    name: "Nitin Kamia",
-    email: "nitinkamia@example.com",
-    enrollment: "04924402023",
-  },
-  {
-    id: "05024402023",
-    name: "Krishna goyal",
-    email: "krishnagoyal@example.com",
-    enrollment: "05024402023",
-  },
-  {
-    id: "05124402023",
-    name: "Ashish Luthra",
-    email: "ashishluthra@example.com",
-    enrollment: "05124402023",
-  },
-  {
-    id: "3rd-year-E1",
-    name: "Farhan Ali",
-    email: "farhanandfarhanali@gmail.com",
-    enrollment: "05524402023",
-  },
-  {
-    id: "05324402023",
-    name: "Jashandeep singh",
-    email: "jashandeepsingh@example.com",
-    enrollment: "05324402023",
-  },
-  {
-    id: "05424402023",
-    name: "Aditiya Bhardwaj",
-    email: "aditiyabhardwaj@example.com",
-    enrollment: "05424402023",
-  },
-  {
-    id: "05624402023",
-    name: "Shreeyansh Srivastava",
-    email: "shreeyanshsrivastava@example.com",
-    enrollment: "05624402023",
-  },
-  {
-    id: "05724402023",
-    name: "Priyanshu sharma",
-    email: "priyanshusharma@example.com",
-    enrollment: "05724402023",
-  },
-];
+interface Student {
+  id: string;
+  name: string;
+  email: string;
+  enrollment: string;
+}
 
 // Extract subjects for a specific day
 const getSubjectsForDay = (dayName: string) => {
@@ -489,17 +167,116 @@ interface AttendanceStatus {
 export default function AttendanceManager() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [attendance, setAttendance] = useState<AttendanceStatus>({});
+  const [students, setStudents] = useState<Student[]>([]);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const isMobile = useIsMobile();
+  const [studentsLoaded, setStudentsLoaded] = useState(false);
 
+  // Custom Subjects Management
+  const [isEditSubjectsOpen, setIsEditSubjectsOpen] = useState(false);
+  const [customSchedule, setCustomSchedule] = useState<Record<string, Array<{ time: string; subject: string; bg: string }>>>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem("attendanceCustomSchedule");
+      return saved ? JSON.parse(saved) : {};
+    }
+    return {};
+  });
+
+  // Persist custom schedule
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem("attendanceCustomSchedule", JSON.stringify(customSchedule));
+    }
+  }, [customSchedule]);
+  
   const dayName = format(selectedDate, "EEEE"); // Monday, Tuesday, etc.
-  const subjectsForDay = useMemo(() => getSubjectsForDay(dayName), [dayName]);
+
+  // Merge default schedule with custom overrides
+  const subjectsForDay = useMemo(() => {
+    // If we have a custom schedule for this specific date string (YYYY-MM-DD), use it
+    const dateKey = format(selectedDate, "yyyy-MM-dd");
+    if (customSchedule[dateKey]) {
+      return customSchedule[dateKey];
+    }
+    // Fallback to day-of-week based default schedule or custom day-of-week override if we implemented that
+    return getSubjectsForDay(dayName);
+  }, [dayName, selectedDate, customSchedule]);
+
+  // Temp state for editing
+  const [editingSubjects, setEditingSubjects] = useState<Array<{ time: string; subject: string; bg: string }>>([]);
+
+  const handleOpenEditSubjects = () => {
+    setEditingSubjects([...subjectsForDay]);
+    setIsEditSubjectsOpen(true);
+  };
+
+  const handleSaveSubjects = () => {
+    const dateKey = format(selectedDate, "yyyy-MM-dd");
+    setCustomSchedule(prev => ({
+      ...prev,
+      [dateKey]: editingSubjects
+    }));
+    setIsEditSubjectsOpen(false);
+    
+    // Reset attendance for this day since subjects changed to avoid mismatches?
+    // Or keep existing and just add new keys. 
+    // Ideally we should keep common subjects.
+  };
+
+  const handleAddSubject = () => {
+    setEditingSubjects([
+      ...editingSubjects, 
+      { time: "00:00 - 00:00", subject: "New Subject", bg: "from-gray-500 to-gray-600" }
+    ]);
+  };
+
+  const handleRemoveSubject = (index: number) => {
+    const newSubjects = [...editingSubjects];
+    newSubjects.splice(index, 1);
+    setEditingSubjects(newSubjects);
+  };
+
+  const handleSubjectChange = (index: number, field: keyof typeof editingSubjects[0], value: string) => {
+    const newSubjects = [...editingSubjects];
+    newSubjects[index] = { ...newSubjects[index], [field]: value };
+    setEditingSubjects(newSubjects);
+  };
+
+  // Load students on mount
+  useEffect(() => {
+    const fetchStudents = async () => {
+      try {
+        // Fetch students for the user's section
+        const response = await fetch("/api/bulk-users/e1-students", {
+           credentials: "include" 
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.students) {
+            // Map backend user to Student interface (id mapped to _id)
+            const mappedStudents = data.students.map((s: any) => ({
+               id: s._id,
+               name: s.name,
+               email: s.email,
+               enrollment: s.enrollment || s.username // fallback if enrollment missing
+            }));
+            setStudents(mappedStudents);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch students", err);
+      } finally {
+        setStudentsLoaded(true);
+      }
+    };
+    fetchStudents();
+  }, []);
 
   // Filter students based on search term
-  const filteredStudents = E1Students.filter(
+  const filteredStudents = students.filter(
     (student) =>
       student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       student.enrollment.toLowerCase().includes(searchTerm.toLowerCase())
@@ -507,6 +284,9 @@ export default function AttendanceManager() {
 
   // Load existing attendance for selected date
   useEffect(() => {
+    // Wait for students to be loaded before loading attendance
+    if (!studentsLoaded) return;
+
     const loadExistingAttendance = async () => {
       setIsLoading(true);
       try {
@@ -524,7 +304,7 @@ export default function AttendanceManager() {
             const loadedAttendance: AttendanceStatus = {};
 
             // Initialize all students and subjects
-            E1Students.forEach((student) => {
+            students.forEach((student) => {
               loadedAttendance[student.id] = {};
               subjectsForDay.forEach(({ subject }) => {
                 loadedAttendance[student.id][subject] = undefined;
@@ -532,16 +312,25 @@ export default function AttendanceManager() {
             });
 
             // Apply loaded data
-            result.data.students.forEach((studentRecord: any) => {
-              if (loadedAttendance[studentRecord.studentId]) {
-                studentRecord.subjects.forEach((subjectRecord: any) => {
-                  loadedAttendance[studentRecord.studentId][
-                    subjectRecord.subjectName
-                  ] = subjectRecord.status;
-                });
-              }
-            });
-
+            // Note: result.data is now array of normalized records if using new API, 
+            // OR if using legacy response format wrapper, it mimics old structure.
+            // Let's assume the GET /daily route maintained legacy structure: { students: [...] }
+            if (result.data.students) {
+               result.data.students.forEach((studentRecord: any) => {
+                if (loadedAttendance[studentRecord.studentId]) {
+                  studentRecord.subjects.forEach((subjectRecord: any) => {
+                    loadedAttendance[studentRecord.studentId][
+                      subjectRecord.subjectName
+                    ] = subjectRecord.status;
+                  });
+                }
+               });
+            } else if (Array.isArray(result.data)) {
+               // Handle normalized array format if that's what returns
+               // But our refactor of GET /daily tried to match legacy format.
+               // Let's assume legacy format for now as per our previous work.
+            }
+            
             setAttendance(loadedAttendance);
           } else {
             // Initialize empty attendance for new date
@@ -560,7 +349,7 @@ export default function AttendanceManager() {
 
     const initializeEmptyAttendance = () => {
       const initialAttendance: AttendanceStatus = {};
-      E1Students.forEach((student) => {
+      students.forEach((student) => {
         initialAttendance[student.id] = {};
         subjectsForDay.forEach(({ subject }) => {
           initialAttendance[student.id][subject] = undefined;
@@ -570,7 +359,7 @@ export default function AttendanceManager() {
     };
 
     loadExistingAttendance();
-  }, [selectedDate, subjectsForDay]);
+  }, [selectedDate, subjectsForDay, students, studentsLoaded]);
 
   // Toggle attendance status: undefined -> present -> absent -> undefined
   const toggleAttendance = (studentId: string, subject: string) => {
@@ -600,7 +389,7 @@ export default function AttendanceManager() {
   const markAllPresent = (subject: string) => {
     setAttendance((prev) => {
       const updated = { ...prev };
-      E1Students.forEach((student) => {
+      students.forEach((student) => {
         if (!updated[student.id]) {
           updated[student.id] = {};
         }
@@ -614,7 +403,7 @@ export default function AttendanceManager() {
   const markAllAbsent = (subject: string) => {
     setAttendance((prev) => {
       const updated = { ...prev };
-      E1Students.forEach((student) => {
+      students.forEach((student) => {
         if (!updated[student.id]) {
           updated[student.id] = {};
         }
@@ -647,7 +436,7 @@ export default function AttendanceManager() {
         return "✗";
       default:
         return "○";
-    }
+      }
   };
 
   // Save attendance
@@ -682,7 +471,7 @@ export default function AttendanceManager() {
   // Reset attendance for the day
   const resetAttendance = () => {
     const resetAttendance: AttendanceStatus = {};
-    E1Students.forEach((student) => {
+    students.forEach((student) => {
       resetAttendance[student.id] = {};
       subjectsForDay.forEach(({ subject }) => {
         resetAttendance[student.id][subject] = undefined;
@@ -695,7 +484,7 @@ export default function AttendanceManager() {
   const getAttendanceStats = () => {
     let totalMarked = 0;
     let totalPresent = 0;
-    let totalPossible = E1Students.length * subjectsForDay.length;
+    let totalPossible = students.length * subjectsForDay.length;
 
     Object.values(attendance).forEach((studentAttendance) => {
       Object.values(studentAttendance || {}).forEach((status) => {
@@ -726,7 +515,7 @@ export default function AttendanceManager() {
     });
     csvContent += "\n";
 
-    E1Students.forEach((student) => {
+    students.forEach((student) => {
       csvContent += `"${student.name}","${student.enrollment}"`;
       subjectsForDay.forEach(({ subject }) => {
         const status = attendance[student.id]?.[subject];
@@ -806,7 +595,7 @@ export default function AttendanceManager() {
 
   const handleExport = () => {
     // Flatten data for export
-    const exportData = E1Students.map(student => {
+    const exportData = students.map(student => {
       const studentAttendance = attendance[student.id] || {};
       const row: any = {
         "Student Name": student.name,
@@ -835,7 +624,7 @@ export default function AttendanceManager() {
             dayName={dayName}
             selectedDate={selectedDate}
             stats={stats}
-            totalStudents={E1Students.length}
+            totalStudents={students.length}
             currentSubject={currentActiveSubject}
             onMarkAllPresent={() => currentActiveSubject && markAllPresent(currentActiveSubject.subject)}
             onMarkAllAbsent={() => currentActiveSubject && markAllAbsent(currentActiveSubject.subject)}
@@ -1002,6 +791,15 @@ export default function AttendanceManager() {
           </Button>
 
           <Button
+            variant="outline"
+            onClick={handleOpenEditSubjects}
+            className="flex items-center gap-2 flex-1 md:flex-none"
+          >
+            <Edit className="h-4 w-4" />
+            Edit Subjects
+          </Button>
+
+          <Button
             onClick={handleSaveAttendance}
             disabled={isSaving || isLoading || subjectsForDay.length === 0}
             className="flex items-center gap-2 flex-1 md:flex-none w-full md:w-auto" // Full width save button
@@ -1011,6 +809,58 @@ export default function AttendanceManager() {
           </Button>
         </div>
       </div>
+
+      <Dialog open={isEditSubjectsOpen} onOpenChange={setIsEditSubjectsOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Subjects for {format(selectedDate, "PPP")}</DialogTitle>
+            <DialogDescription>
+              Customize the subjects and time slots for this specific date. Changes apply only to this day.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            {editingSubjects.map((subject, index) => (
+              <div key={index} className="flex items-end gap-3 p-3 border rounded-lg bg-gray-50">
+                <div className="grid gap-2 flex-1">
+                  <Label>Time Slot</Label>
+                  <Input 
+                    value={subject.time} 
+                    onChange={(e) => handleSubjectChange(index, "time", e.target.value)}
+                    placeholder="e.g. 10:30 AM - 11:30 AM"
+                  />
+                </div>
+                <div className="grid gap-2 flex-1">
+                  <Label>Subject Name</Label>
+                  <Input 
+                    value={subject.subject} 
+                    onChange={(e) => handleSubjectChange(index, "subject", e.target.value)}
+                    placeholder="e.g. Machine Learning"
+                  />
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                  onClick={() => handleRemoveSubject(index)}
+                >
+                  <Trash2 className="h-5 w-5" />
+                </Button>
+              </div>
+            ))}
+            
+            <Button variant="outline" onClick={handleAddSubject} className="w-full border-dashed">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Subject Slot
+            </Button>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditSubjectsOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveSubjects}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
 
       {/* Main Content with Tabs */}
@@ -1033,7 +883,7 @@ export default function AttendanceManager() {
             <Card>
               <CardContent className="p-4">
                 <div className="text-2xl font-bold text-blue-600">
-                  {E1Students.length}
+                  {students.length}
                 </div>
                 <div className="text-sm text-gray-600">Total Students</div>
               </CardContent>
@@ -1084,7 +934,7 @@ export default function AttendanceManager() {
               />
             </div>
             <div className="text-sm text-gray-600">
-              Showing {filteredStudents.length} of {E1Students.length} students
+              Showing {filteredStudents.length} of {students.length} students
             </div>
           </div>
 

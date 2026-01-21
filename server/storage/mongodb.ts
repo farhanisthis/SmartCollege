@@ -17,13 +17,14 @@ import {
   FileModel,
   UserViewModel,
   AssignmentSubmissionModel,
-  DailyAttendanceModel,
+  AttendanceModel,
   PresentationModel,
   PerformanceMetricsModel,
   type IUserDocument,
   type IUpdateDocument,
   type IFileDocument,
   type IUserViewDocument,
+  type IAttendanceDocument,
 } from "../models/mongodb";
 
 export class MongoStorage implements IStorage {
@@ -58,7 +59,7 @@ export class MongoStorage implements IStorage {
       this.isConnected = true;
 
       // Initialize sample data if collections are empty
-      await this.initializeSampleData();
+      // await this.initializeSampleData();
     } catch (error) {
       console.error("MongoDB connection error:", error);
       this.isConnected = false;
@@ -174,39 +175,29 @@ export class MongoStorage implements IStorage {
 
       for (const studentId of studentIds) {
         // 85% attendance rate - randomly miss some days
-        const isPresent = Math.random() > 0.15;
+        const subjects = [
+          "Mathematics",
+          "Physics",
+          "Chemistry",
+          "English",
+          "Computer Science",
+        ];
 
-        const dailyAttendance = await DailyAttendanceModel.findOneAndUpdate(
-          {
-            date: date,
-            classSection: "E1",
-          },
-          {
-            $setOnInsert: {
-              _id: randomUUID(),
-              markedBy: crIds[0],
-            },
-            $push: {
-              students: {
-                studentId: studentId,
-                subjects: [
-                  {
-                    subjectName: [
-                      "Mathematics",
-                      "Physics",
-                      "Chemistry",
-                      "English",
-                      "Computer Science",
-                    ][Math.floor(Math.random() * 5)],
-                    status: isPresent ? "present" : "absent",
-                    timestamp: new Date(),
-                  },
-                ],
-              },
-            },
-          },
-          { upsert: true, new: true }
-        );
+        for (const subjectName of subjects) {
+          const isPresent = Math.random() > 0.15;
+          
+          await AttendanceModel.create({
+             _id: randomUUID(),
+             studentId: studentId,
+             date: date,
+             subject: subjectName,
+             status: isPresent ? "present" : "absent",
+             markedBy: crIds[0],
+             classSection: "E1",
+             createdAt: new Date(),
+             updatedAt: new Date(),
+          });
+        }
       }
     }
 
@@ -351,25 +342,13 @@ export class MongoStorage implements IStorage {
 
     // Create performance metrics for each student
     for (const studentId of studentIds) {
-      const dailyRecords = await DailyAttendanceModel.find({
-        "students.studentId": studentId,
+      const totalSubjectInstances = await AttendanceModel.countDocuments({
+        studentId: studentId,
       });
 
-      let totalSubjectInstances = 0;
-      let presentSubjectInstances = 0;
-
-      dailyRecords.forEach((record) => {
-        const studentData = record.students.find(
-          (s) => s.studentId === studentId
-        );
-        if (studentData) {
-          studentData.subjects.forEach((subj) => {
-            totalSubjectInstances++;
-            if (subj.status === "present") {
-              presentSubjectInstances++;
-            }
-          });
-        }
+      const presentSubjectInstances = await AttendanceModel.countDocuments({
+        studentId: studentId,
+        status: "present",
       });
 
       const attendancePercentage =
@@ -524,24 +503,14 @@ export class MongoStorage implements IStorage {
         status: "completed",
       });
 
-      // Calculate attendance percentage using DailyAttendanceModel
-      const dailyRecords = await DailyAttendanceModel.find({
-        "students.studentId": userId,
+      // Calculate attendance percentage using AttendanceModel
+      const totalSubjectInstances = await AttendanceModel.countDocuments({
+        studentId: userId,
       });
 
-      let totalSubjectInstances = 0;
-      let presentSubjectInstances = 0;
-
-      dailyRecords.forEach((record) => {
-        const studentData = record.students.find((s) => s.studentId === userId);
-        if (studentData) {
-          studentData.subjects.forEach((subj) => {
-            totalSubjectInstances++;
-            if (subj.status === "present") {
-              presentSubjectInstances++;
-            }
-          });
-        }
+      const presentSubjectInstances = await AttendanceModel.countDocuments({
+        studentId: userId,
+        status: "present",
       });
 
       const attendancePercentage =

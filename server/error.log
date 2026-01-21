@@ -1,0 +1,72 @@
+
+> smart-college-server@1.0.0 check
+> tsc
+
+models/mongodb.ts(4,18): error TS2430: Interface 'IUserDocument' incorrectly extends interface 'Document<ObjectId, any, any, Record<string, any>, {}>'.
+  Types of property '_id' are incompatible.
+    Type 'string' is not assignable to type 'ObjectId'.
+models/mongodb.ts(83,18): error TS2430: Interface 'IUpdateDocument' incorrectly extends interface 'Document<ObjectId, any, any, Record<string, any>, {}>'.
+  Types of property '_id' are incompatible.
+    Type 'string' is not assignable to type 'ObjectId'.
+models/mongodb.ts(133,18): error TS2430: Interface 'IFileDocument' incorrectly extends interface 'Document<ObjectId, any, any, Record<string, any>, {}>'.
+  Types of property '_id' are incompatible.
+    Type 'string' is not assignable to type 'ObjectId'.
+models/mongodb.ts(154,18): error TS2430: Interface 'IUserViewDocument' incorrectly extends interface 'Document<ObjectId, any, any, Record<string, any>, {}>'.
+  Types of property '_id' are incompatible.
+    Type 'string' is not assignable to type 'ObjectId'.
+models/mongodb.ts(169,18): error TS2430: Interface 'IAssignmentSubmissionDocument' incorrectly extends interface 'Document<ObjectId, any, any, Record<string, any>, {}>'.
+  Types of property '_id' are incompatible.
+    Type 'string' is not assignable to type 'ObjectId'.
+models/mongodb.ts(197,18): error TS2430: Interface 'IAttendanceDocument' incorrectly extends interface 'Document<ObjectId, any, any, Record<string, any>, {}>'.
+  Types of property '_id' are incompatible.
+    Type 'string' is not assignable to type 'ObjectId'.
+models/mongodb.ts(231,18): error TS2430: Interface 'IPresentationDocument' incorrectly extends interface 'Document<ObjectId, any, any, Record<string, any>, {}>'.
+  Types of property '_id' are incompatible.
+    Type 'string' is not assignable to type 'ObjectId'.
+models/mongodb.ts(258,18): error TS2430: Interface 'IPerformanceMetricsDocument' incorrectly extends interface 'Document<ObjectId, any, any, Record<string, any>, {}>'.
+  Types of property '_id' are incompatible.
+    Type 'string' is not assignable to type 'ObjectId'.
+routes.ts(13,27): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+routes/attendance.ts(1052,38): error TS2552: Cannot find name 'DailyAttendanceModel'. Did you mean 'AttendanceModel'?
+routes/attendance.ts(1339,38): error TS2552: Cannot find name 'DailyAttendanceModel'. Did you mean 'AttendanceModel'?
+routes/bulk-users.ts(5,3): error TS2724: '"../models/mongodb"' has no exported member named 'DailyAttendanceModel'. Did you mean 'AttendanceModel'?
+routes/performance.ts(4,3): error TS2724: '"../models/mongodb"' has no exported member named 'DailyAttendanceModel'. Did you mean 'AttendanceModel'?
+routes/performance.ts(70,35): error TS7006: Parameter 'record' implicitly has an 'any' type.
+routes/performance.ts(71,49): error TS7006: Parameter 's' implicitly has an 'any' type.
+routes/performance.ts(74,39): error TS7006: Parameter 'subjectRecord' implicitly has an 'any' type.
+routes/performance.ts(323,33): error TS7006: Parameter 'dailyRecord' implicitly has an 'any' type.
+routes/performance.ts(325,10): error TS7006: Parameter 's' implicitly has an 'any' type.
+routes/performance.ts(329,42): error TS7006: Parameter 'subjectRecord' implicitly has an 'any' type.
+routes/performance.ts(364,50): error TS7006: Parameter 'a' implicitly has an 'any' type.
+routes/performance.ts(367,54): error TS7006: Parameter 'sub' implicitly has an 'any' type.
+routes/performance.ts(371,58): error TS7006: Parameter 'sub' implicitly has an 'any' type.
+routes/performance.ts(380,59): error TS7006: Parameter 'assignment' implicitly has an 'any' type.
+routes/performance.ts(392,60): error TS7006: Parameter 'p' implicitly has an 'any' type.
+routes/performance.ts(398,8): error TS7006: Parameter 'pres' implicitly has an 'any' type.
+routes/performance.ts(403,70): error TS7006: Parameter 'p' implicitly has an 'any' type.
+routes/performance.ts(409,8): error TS7006: Parameter 'presentation' implicitly has an 'any' type.
+routes/performance.ts(419,10): error TS7006: Parameter 'u' implicitly has an 'any' type.
+routes/performance.ts(476,31): error TS7006: Parameter 'sub' implicitly has an 'any' type.
+routes/performance.ts(482,41): error TS7006: Parameter 'pres' implicitly has an 'any' type.
+routes/performance.ts(489,33): error TS7006: Parameter 'record' implicitly has an 'any' type.
+routes/performance.ts(491,10): error TS7006: Parameter 's' implicitly has an 'any' type.
+routes/performance.ts(495,12): error TS7006: Parameter 's' implicitly has an 'any' type.
+routes/performance.ts(525,35): error TS7006: Parameter 'a' implicitly has an 'any' type.
+routes/performance.ts(528,43): error TS7006: Parameter 'p' implicitly has an 'any' type.
+routes/performance.ts(538,12): error TS7006: Parameter 'a' implicitly has an 'any' type.
+routes/performance.ts(541,12): error TS7006: Parameter 'p' implicitly has an 'any' type.
+routes/performance.ts(545,61): error TS7006: Parameter 'sub' implicitly has an 'any' type.
+routes/performance.ts(547,14): error TS7006: Parameter 'a' implicitly has an 'any' type.
+routes/performance.ts(552,12): error TS7006: Parameter 'pres' implicitly has an 'any' type.
+routes/performance.ts(554,16): error TS7006: Parameter 'p' implicitly has an 'any' type.
+routes/performance.ts(591,57): error TS7006: Parameter 'sub' implicitly has an 'any' type.
+routes/performance.ts(771,8): error TS7006: Parameter 's' implicitly has an 'any' type.
+routes/performance.ts(784,8): error TS7006: Parameter 's' implicitly has an 'any' type.
+routes/performance.ts(840,12): error TS7006: Parameter 's' implicitly has an 'any' type.
+routes/performance.ts(845,14): error TS7006: Parameter 's' implicitly has an 'any' type.
+routes/performance.ts(853,14): error TS7006: Parameter 's' implicitly has an 'any' type.
+services/ai.ts(4,27): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+services/aiManager.ts(6,8): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+services/aiManager.ts(7,32): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+services/attendanceProcessor.ts(1,27): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+services/attendanceTextParser.ts(1,27): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.

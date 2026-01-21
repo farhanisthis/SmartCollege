@@ -1,5 +1,5 @@
 import express, { Request, Response, NextFunction } from "express";
-import { DailyAttendanceModel, UserModel } from "../models/mongodb";
+import { AttendanceModel, UserModel } from "../models/mongodb";
 import { nanoid } from "nanoid";
 import { format } from "date-fns";
 import { upload } from "../services/fileUpload";
@@ -205,7 +205,7 @@ const requireCRRole = (
   next();
 };
 
-// Get attendance for a specific date
+// Get attendance for a specific day
 router.get(
   "/daily",
   requireAuth,
@@ -221,55 +221,53 @@ router.get(
 
       const section = getSection(req.user?.class || "");
       if (!section) {
-         // Return empty if no section is found vs error
          return res.json({ success: true, data: null });
       }
 
-      console.log(`Fetching attendance for date: ${date}, Section: ${section}`);
+      const queryDate = new Date(date as string);
+      console.log(`Fetching attendance for date: ${queryDate}, Section: ${section}`);
 
-      const attendanceRecord = await DailyAttendanceModel.findOne({
-        date: new Date(date as string),
-        classSection: section, // Dynamic Section
-      });
+      // Fetch all attendance records for this date and section
+      const records = await AttendanceModel.find({
+        date: queryDate,
+        classSection: section,
+      }).lean();
 
-      if (attendanceRecord) {
-        console.log(`Found attendance record: Yes`);
-        console.log(`Record ID: ${attendanceRecord._id}`);
-        console.log(
-          `Students count: ${
-            attendanceRecord.students ? attendanceRecord.students.length : 0
-          }`
-        );
-
-        // Fix existing data with wrong subject names (one-time conversion)
-        if (attendanceRecord.students) {
-          attendanceRecord.students = attendanceRecord.students.map(
-            (student: any) => ({
-              ...student,
-              subjects: student.subjects.map((subject: any) => ({
-                ...subject,
-                subjectName:
-                  subject.subjectName === "Cloud Computing"
-                    ? "CC"
-                    : subject.subjectName === "Computer Graphics"
-                    ? "CG"
-                    : subject.subjectName,
-              })),
-            })
-          );
-        }
-
-        console.log(
-          `Students data (fixed):`,
-          JSON.stringify(attendanceRecord.students, null, 2)
-        );
-      } else {
-        console.log(`Found attendance record: No`);
+      if (records.length === 0) {
+        return res.json({ success: true, data: null });
       }
+
+      // Group by studentId to reconstruct the expected legacy format
+      const studentMap = new Map<string, any>();
+      
+      for (const record of records) {
+        if (!studentMap.has(record.studentId)) {
+          studentMap.set(record.studentId, {
+            studentId: record.studentId,
+            subjects: []
+          });
+        }
+        studentMap.get(record.studentId).subjects.push({
+          subjectName: record.subject,
+          status: record.status,
+          timestamp: record.createdAt // Use creation time as timestamp
+        });
+      }
+
+      // Construct the response object that looks like the old DailyAttendance document
+      const reconstructedDoc = {
+        _id: `generated-${queryDate.getTime()}`, // Virtual ID since we don't have a single doc
+        date: queryDate,
+        classSection: section,
+        markedBy: records[0].markedBy, // Take from first record
+        students: Array.from(studentMap.values())
+      };
+
+      console.log(`Found ${records.length} records, grouped into ${studentMap.size} students`);
 
       res.json({
         success: true,
-        data: attendanceRecord || null,
+        data: reconstructedDoc,
       });
     } catch (error) {
       console.error("Error fetching attendance:", error);
@@ -303,13 +301,12 @@ router.post(
         });
       }
 
-      console.log(`Saving attendance for date: ${date} by user: ${userId} in Section: ${section}`);
-      console.log(
-        `Attendance data received:`,
-        JSON.stringify(attendance, null, 2)
-      );
-
+      const attendanceDate = new Date(date);
+      console.log(`Saving attendance for date: ${attendanceDate} by user: ${userId} in Section: ${section}`);
+      
       // Valid subject names from timetable
+      // Relaxed validation to allow for dynamic subjects (Sixth Semester)
+      /*
       const validSubjects = [
         "Computer Graphics",
         "CG",
@@ -323,202 +320,70 @@ router.post(
         "ML Lab 4",
         "Linux Lab 4",
       ];
+      */
 
-      // Validation function for status
-      const validateStatus = (status: any): "present" | "absent" => {
-        if (typeof status === "string") {
-          const normalizedStatus = status.toLowerCase().trim();
-          if (normalizedStatus === "present" || normalizedStatus === "p") {
-            return "present";
-          } else if (
-            normalizedStatus === "absent" ||
-            normalizedStatus === "a"
-          ) {
-            return "absent";
-          }
-        }
-        // Default to absent for invalid status
-        console.warn(`Invalid status "${status}" - defaulting to absent`);
-        return "absent";
-      };
+      // Prepare bulk operations
+      const operations: any[] = [];
 
-      // Validation function for subject name
-      const validateSubjectName = (subjectName: any): string | null => {
-        if (typeof subjectName === "string" && subjectName.trim().length > 0) {
-          const normalized = subjectName.trim();
+      // Validate and process attendance data
+      Object.entries(attendance).forEach(([studentId, statusOrSubjects]: [string, any]) => {
+         // ... existing validation logic ...
+         if (!studentId || typeof studentId !== "string" || studentId.trim().length < 5) return;
 
-          // Reject numeric-only subject names (corrupted data)
-          if (/^\d+$/.test(normalized)) {
-            console.warn(`Rejecting numeric subject name: "${normalized}"`);
-            return null;
-          }
+         let subjectsData: Array<{subjectName: string; status: "present" | "absent"}> = [];
 
-          // Reject single characters (corrupted data)
-          if (normalized.length === 1) {
-            console.warn(`Rejecting single character subject: "${normalized}"`);
-            return null;
-          }
-
-          // Check if it's a valid subject from our list or normalize common abbreviations
-          if (validSubjects.includes(normalized)) {
-            return normalized;
-          }
-
-          // Try to match common variations
-          switch (normalized.toLowerCase()) {
-            case "cg":
-              return "Computer Graphics";
-            case "os":
-              return "Operating Systems";
-            case "cc":
-              return "Cloud Computing";
-            case "ml":
-              return "Machine Learning";
-            case "cg lab":
-            case "cg lab 4":
-              return "CG Lab 4";
-            case "ml lab":
-            case "ml lab 4":
-              return "ML Lab 4";
-            case "linux":
-            case "linux lab":
-            case "linux lab 4":
-              return "Linux Lab 4";
-            default:
-              console.warn(
-                `Unknown subject name: "${normalized}" - accepting as-is`
-              );
-              return normalized;
-          }
-        }
-
-        console.warn(`Invalid subject name: "${subjectName}"`);
-        return null;
-      };
-
-      // Transform attendance data to match schema
-      const students = Object.entries(attendance)
-        .map(([studentId, statusOrSubjects]: [string, any]) => {
-          // Handle two possible formats:
-          // Format 1: attendance[studentId] = "present" (simple format)
-          // Format 2: attendance[studentId] = {subject1: "present", subject2: "absent"} (detailed format)
-
-          let subjectsData: Array<{
-            subjectName: string;
-            status: "present" | "absent";
-            timestamp: Date;
-          }> = [];
-
-          // Validate student ID (accept both UUID and numeric student IDs)
-          if (
-            !studentId ||
-            typeof studentId !== "string" ||
-            studentId.trim().length < 5 ||
-            studentId.trim().length > 50
-          ) {
-            console.warn(`Invalid student ID: "${studentId}" - skipping`);
-            return null;
-          }
-
-          if (typeof statusOrSubjects === "string") {
-            // Simple format - apply same status to all subjects for the day
-            // Get subjects from timetable for this day
-            const dayOfWeek = format(new Date(date), "EEEE");
+         if (typeof statusOrSubjects === "string") {
+            const dayOfWeek = format(attendanceDate, "EEEE");
             const subjects = getSubjectsForDay(dayOfWeek);
-
-            const validatedStatus = validateStatus(statusOrSubjects);
-
-            console.log(`Processing attendance for ${dayOfWeek}:`, {
-              studentId,
-              status: validatedStatus,
-              subjects: subjects,
+            const status = (statusOrSubjects.toLowerCase() === "present" || statusOrSubjects.toLowerCase() === "p") ? "present" : "absent";
+            
+            subjects.forEach(subject => {
+                subjectsData.push({ subjectName: subject, status });
             });
+         } else if (typeof statusOrSubjects === "object") {
+            Object.entries(statusOrSubjects).forEach(([subject, status]: [string, any]) => {
+                // Check if status is defined
+                if (status === undefined || status === null) return;
+                const validStatus = (String(status).toLowerCase() === "present" || String(status).toLowerCase() === "p") ? "present" : "absent";
+                subjectsData.push({ subjectName: subject, status: validStatus });
+            });
+         }
 
-            subjectsData = subjects
-              .map((subject: string) => {
-                const validSubject = validateSubjectName(subject);
-                return validSubject
-                  ? {
-                      subjectName: validSubject,
-                      status: validatedStatus,
-                      timestamp: new Date(),
-                    }
-                  : null;
-              })
-              .filter(
-                (item): item is NonNullable<typeof item> => item !== null
-              );
-          } else if (
-            typeof statusOrSubjects === "object" &&
-            statusOrSubjects !== null
-          ) {
-            // Detailed format - per-subject attendance
-            subjectsData = Object.entries(statusOrSubjects)
-              .filter(([_, status]) => status !== undefined && status !== null)
-              .map(([subjectName, status]) => {
-                const validSubject = validateSubjectName(subjectName);
-                const validStatus = validateStatus(status);
+         subjectsData.forEach(item => {
+             operations.push({
+                 updateOne: {
+                     filter: { 
+                         studentId: studentId, 
+                         date: attendanceDate, 
+                         subject: item.subjectName 
+                     },
+                     update: { 
+                         $set: { 
+                             status: item.status, 
+                             markedBy: userId,
+                             classSection: section,
+                             updatedAt: new Date()
+                         },
+                         $setOnInsert: {
+                             _id: nanoid(),
+                             createdAt: new Date()
+                         }
+                     },
+                     upsert: true
+                 }
+             });
+         });
+      });
 
-                return validSubject
-                  ? {
-                      subjectName: validSubject,
-                      status: validStatus,
-                      timestamp: new Date(),
-                    }
-                  : null;
-              })
-              .filter(
-                (item): item is NonNullable<typeof item> => item !== null
-              );
-          } else {
-            subjectsData = [];
-          }
-
-          return {
-            studentId,
-            subjects: subjectsData,
-          };
-        })
-        .filter(
-          (student): student is NonNullable<typeof student> =>
-            student !== null && student.subjects.length > 0
-        );
-
-      console.log(
-        `Transformed students data:`,
-        students.length,
-        "students with attendance"
-      );
-
-      // Update or create attendance record
-      const attendanceRecord = await DailyAttendanceModel.findOneAndUpdate(
-        {
-          date: new Date(date),
-          classSection: section, // Dynamic
-        },
-        {
-          $setOnInsert: {
-            _id: nanoid(),
-          },
-          $set: {
-            date: new Date(date),
-            classSection: section, // Dynamic
-            markedBy: userId,
-            students: students,
-          },
-        },
-        {
-          upsert: true,
-          new: true,
-        }
-      );
-
-      console.log(`Attendance saved successfully:`, attendanceRecord._id);
+      if (operations.length > 0) {
+          await AttendanceModel.bulkWrite(operations);
+          console.log(`Executed ${operations.length} attendance updates`);
+      }
 
       res.json({
         success: true,
         message: "Attendance saved successfully",
-        data: attendanceRecord,
+        data: { count: operations.length }
       });
     } catch (error) {
       console.error("Error saving attendance:", error);
@@ -557,15 +422,36 @@ router.get(
         };
       }
 
-      const attendanceHistory = await DailyAttendanceModel.find(query)
-        .sort({ date: -1 })
-        .limit(parseInt(limit as string));
+      // Aggregate distinct dates first to show history list
+      const distinctDates = await AttendanceModel.distinct("date", query);
+      
+      // Sort dates descending and limits
+      const sortedDates = distinctDates
+          .map(d => new Date(d))
+          .sort((a, b) => b.getTime() - a.getTime())
+          .slice(0, parseInt(limit as string));
 
-      console.log(`Found ${attendanceHistory.length} attendance records`);
+      const history = await Promise.all(sortedDates.map(async (date) => {
+          const count = await AttendanceModel.distinct("studentId", {
+               date: date,
+               classSection: section
+          });
+          
+          return {
+              _id: `history-${date.getTime()}`,
+              date: date,
+              classSection: section,
+              studentCount: count.length,
+              // Legacy fields stub
+              students: [] 
+          };
+      }));
+
+      console.log(`Found ${history.length} attendance history records`);
 
       res.json({
         success: true,
-        data: attendanceHistory,
+        data: history,
       });
     } catch (error) {
       console.error("Error fetching attendance history:", error);
@@ -601,13 +487,13 @@ router.get(
       const startDate = new Date(currentYear, currentMonth - 1, 1);
       const endDate = new Date(currentYear, currentMonth, 0);
 
-      const attendanceRecords = await DailyAttendanceModel.find({
-        classSection: section, // Dynamic
+      const records = await AttendanceModel.find({
+        classSection: section, 
         date: { $gte: startDate, $lte: endDate },
-      });
+      }).lean();
 
       console.log(
-        `Found ${attendanceRecords.length} records for stats calculation`
+        `Found ${records.length} records for stats calculation`
       );
 
       // Calculate statistics
@@ -617,27 +503,40 @@ router.get(
       > = {};
       let totalPresentCount = 0;
       let totalPossibleCount = 0;
+      const dailyStatsMap = new Map<string, { date: Date, totalStudents: Set<string>, presentCount: number }>();
 
-      attendanceRecords.forEach((record) => {
-        record.students.forEach((student) => {
-          student.subjects.forEach((subject) => {
-            if (!subjectWiseStats[subject.subjectName]) {
-              subjectWiseStats[subject.subjectName] = {
-                present: 0,
-                total: 0,
-                percentage: 0,
-              };
-            }
+      records.forEach((record) => {
+        // Daily stats aggregation
+        const dateKey = record.date.toISOString().split('T')[0];
+        if (!dailyStatsMap.has(dateKey)) {
+            dailyStatsMap.set(dateKey, {
+                date: record.date,
+                totalStudents: new Set(),
+                presentCount: 0
+            });
+        }
+        const dailyStat = dailyStatsMap.get(dateKey)!;
+        dailyStat.totalStudents.add(record.studentId);
+        if (record.status === "present") {
+            dailyStat.presentCount++;
+        }
 
-            subjectWiseStats[subject.subjectName].total++;
-            totalPossibleCount++;
+        // Subject stats aggregation
+        if (!subjectWiseStats[record.subject]) {
+            subjectWiseStats[record.subject] = {
+            present: 0,
+            total: 0,
+            percentage: 0,
+            };
+        }
 
-            if (subject.status === "present") {
-              subjectWiseStats[subject.subjectName].present++;
-              totalPresentCount++;
-            }
-          });
-        });
+        subjectWiseStats[record.subject].total++;
+        totalPossibleCount++;
+
+        if (record.status === "present") {
+            subjectWiseStats[record.subject].present++;
+            totalPresentCount++;
+        }
       });
 
       // Calculate percentages
@@ -648,29 +547,18 @@ router.get(
       });
 
       const stats = {
-        totalDays: attendanceRecords.length,
+        totalDays: dailyStatsMap.size,
         avgAttendance:
           totalPossibleCount > 0
             ? (totalPresentCount / totalPossibleCount) * 100
             : 0,
         subjectWiseStats,
-        dailyStats: attendanceRecords.map((record) => {
-          const totalStudents = record.students.length;
-          const presentCount = record.students.reduce(
-            (acc, student) =>
-              acc +
-              student.subjects.filter((s) => s.status === "present").length,
-            0
-          );
-
-          return {
-            date: record.date,
-            totalStudents,
-            presentCount,
-            subjects:
-              record.students[0]?.subjects.map((s) => s.subjectName) || [],
-          };
-        }),
+        dailyStats: Array.from(dailyStatsMap.values()).map(stat => ({
+            date: stat.date,
+            totalStudents: stat.totalStudents.size,
+            presentCount: stat.presentCount,
+            subjects: [] // Not easily available in aggregate, can leave empty or expensive fetch
+        })),
       };
 
       console.log(`Stats calculated:`, {
@@ -706,19 +594,19 @@ router.delete(
 
       console.log(`Deleting attendance record for date: ${date} Section: ${section}`);
 
-      const result = await DailyAttendanceModel.findOneAndDelete({
+      const result = await AttendanceModel.deleteMany({
         date: new Date(date),
         classSection: section, // Dynamic
       });
 
-      if (!result) {
+      if (result.deletedCount === 0) {
         return res.status(404).json({
           success: false,
           error: "Attendance record not found",
         });
       }
 
-      console.log(`Successfully deleted attendance record: ${result._id}`);
+      console.log(`Successfully deleted ${result.deletedCount} attendance records`);
 
       res.json({
         success: true,
@@ -1096,7 +984,7 @@ router.post(
         "Linux Lab 4",
       ];
 
-      const validateStatus = (status: any): "present" | "absent" => {
+      const validateStatus = (status: string | unknown): "present" | "absent" => {
         if (typeof status === "string") {
           const normalizedStatus = status.toLowerCase().trim();
           if (normalizedStatus === "present" || normalizedStatus === "p") {
@@ -1140,15 +1028,15 @@ router.post(
       const students = Object.entries(attendanceData)
         .map(([studentId, subjectsData]) => {
           const subjectsArray = Object.entries(subjectsData)
-            .filter(([subject, _]) =>
+            .filter(([subject, _]: [string, string]) =>
               validSubjects.some(
-                (vs) =>
+                (vs: string) =>
                   vs.toLowerCase() === subject.toLowerCase() ||
                   subject.toLowerCase().includes(vs.toLowerCase()) ||
                   vs.toLowerCase().includes(subject.toLowerCase())
               )
             )
-            .map(([subjectName, status]) => ({
+            .map(([subjectName, status]: [string, string]) => ({
               subjectName: convertToFrontendSubjectName(subjectName),
               status: validateStatus(status),
               timestamp: new Date(),
@@ -1166,27 +1054,43 @@ router.post(
         );
 
       // Save to database
-      const attendanceRecord = await DailyAttendanceModel.findOneAndUpdate(
-        {
-          date: new Date(attendanceDate),
-          classSection: "E1",
-        },
-        {
-          $setOnInsert: {
-            _id: nanoid(),
-          },
-          $set: {
-            date: new Date(attendanceDate),
-            classSection: "E1",
-            markedBy: userId || "system-text-upload",
-            students: students,
-          },
-        },
-        {
-          upsert: true,
-          new: true,
-        }
-      );
+      const operations: any[] = [];
+      const attendanceDateObj = new Date(attendanceDate);
+
+      // Flatten students data for bulk write
+      students.forEach(student => {
+          student.subjects.forEach(subj => {
+              operations.push({
+                  updateOne: {
+                      filter: {
+                          studentId: student.studentId,
+                          date: attendanceDateObj,
+                          subject: subj.subjectName
+                      },
+                      update: {
+                          $setOnInsert: {
+                              _id: nanoid(),
+                              createdAt: new Date()
+                          },
+                          $set: {
+                              status: subj.status,
+                              classSection: "E1", // Default/Implicit
+                              markedBy: userId || "system-text-upload",
+                              updatedAt: new Date()
+                          }
+                      },
+                      upsert: true
+                  }
+              });
+          });
+      });
+
+      if (operations.length > 0) {
+          await AttendanceModel.bulkWrite(operations);
+      }
+      
+      // Stub for response compatibility
+      const attendanceRecord = { _id: "bulk-update-" + attendanceDate.getTime() };
 
       console.log(
         `[Text Upload] Attendance saved successfully: ${attendanceRecord._id}`
@@ -1383,7 +1287,7 @@ router.post(
         "Linux Lab 4",
       ];
 
-      const validateStatus = (status: any): "present" | "absent" => {
+      const validateStatus = (status: string | unknown): "present" | "absent" => {
         if (typeof status === "string") {
           const normalizedStatus = status.toLowerCase().trim();
           if (normalizedStatus === "present" || normalizedStatus === "p") {
@@ -1427,15 +1331,15 @@ router.post(
       const students = Object.entries(attendanceData)
         .map(([studentId, subjectsData]) => {
           const subjectsArray = Object.entries(subjectsData)
-            .filter(([subject, _]) =>
+            .filter(([subject, _]: [string, string]) =>
               validSubjects.some(
-                (vs) =>
+                (vs: string) =>
                   vs.toLowerCase() === subject.toLowerCase() ||
                   subject.toLowerCase().includes(vs.toLowerCase()) ||
                   vs.toLowerCase().includes(subject.toLowerCase())
               )
             )
-            .map(([subjectName, status]) => ({
+            .map(([subjectName, status]: [string, string]) => ({
               subjectName: convertToFrontendSubjectName(subjectName),
               status: validateStatus(status),
               timestamp: new Date(),
@@ -1453,27 +1357,43 @@ router.post(
         );
 
       // Save to database
-      const attendanceRecord = await DailyAttendanceModel.findOneAndUpdate(
-        {
-          date: new Date(attendanceDate),
-          classSection: "E1",
-        },
-        {
-          $setOnInsert: {
-            _id: nanoid(),
-          },
-          $set: {
-            date: new Date(attendanceDate),
-            classSection: "E1",
-            markedBy: userId || "system-upload", // Use actual user ID
-            students: students,
-          },
-        },
-        {
-          upsert: true,
-          new: true,
-        }
-      );
+      const operations: any[] = [];
+      const attendanceDateObj = new Date(attendanceDate); // attendanceDate is string or date from logic above
+
+      // Flatten students data for bulk write
+      students.forEach(student => {
+          student.subjects.forEach(subj => {
+              operations.push({
+                  updateOne: {
+                      filter: {
+                          studentId: student.studentId,
+                          date: attendanceDateObj,
+                          subject: subj.subjectName
+                      },
+                      update: {
+                          $setOnInsert: {
+                              _id: nanoid(),
+                              createdAt: new Date()
+                          },
+                          $set: {
+                              status: subj.status,
+                              classSection: "E1", // Default/Implicit
+                              markedBy: userId || "system-upload",
+                              updatedAt: new Date()
+                          }
+                      },
+                      upsert: true
+                  }
+              });
+          });
+      });
+
+      if (operations.length > 0) {
+          await AttendanceModel.bulkWrite(operations);
+      }
+
+      // Stub for response compatibility
+      const attendanceRecord = { _id: "bulk-update-" + attendanceDateObj.getTime() };
 
       console.log(
         `[Upload] Attendance saved successfully: ${attendanceRecord._id}`

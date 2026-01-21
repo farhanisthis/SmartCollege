@@ -51,7 +51,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 We encountered an unexpected error while loading this page.
               </p>
               
-              {process.env.NODE_ENV === 'development' && this.state.error && (
+              {import.meta.env.DEV && this.state.error && (
                 <div className="bg-slate-900 text-slate-50 p-4 rounded-md text-xs font-mono overflow-auto max-h-48 my-4 text-left">
                   <p className="font-bold text-red-400 mb-2">{this.state.error.toString()}</p>
                   <p className="opacity-70 whitespace-pre-wrap">
