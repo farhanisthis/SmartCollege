@@ -805,10 +805,17 @@ export default function AttendanceManager() {
              <Button 
                 onClick={handleSaveAttendance}
                 disabled={isSaving}
-                className="w-full h-10 bg-[#ea580c] hover:bg-[#c2410c] text-white rounded-lg shadow-sm shadow-orange-200 font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition-all"
+                className="flex-1 h-10 bg-[#ea580c] hover:bg-[#c2410c] text-white rounded-lg shadow-sm shadow-orange-200 font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition-all"
              >
                <Save className="h-4 w-4" />
                {isSaving ? "Saving..." : "Save attendance"}
+             </Button>
+             <Button 
+                variant="secondary" 
+                className="h-10 w-10 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500"
+                onClick={handleExport}
+             >
+               <Download className="h-4 w-4" />
              </Button>
            </div>
            

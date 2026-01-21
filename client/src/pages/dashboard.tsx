@@ -6,7 +6,6 @@ import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/layout/header";
 import Sidebar from "@/components/layout/sidebar";
 
-import MobileCreateFab from "@/components/layout/mobile-create-fab";
 import UpdateCard from "@/components/updates/update-card";
 import PerformanceDashboard from "./performance-dashboard";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
@@ -684,7 +683,6 @@ export default function Dashboard() {
       )} */}
 
       {/* Mobile Floating Action Button */}
-      <MobileCreateFab onCreateUpdate={() => setIsCreateModalOpen(true)} />
 
       {/* Create Update Modal */}
       {isCR && (
