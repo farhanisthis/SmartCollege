@@ -338,6 +338,10 @@ const StudentDashboard: React.FC = () => {
               attendance: dashboardData.attendance.percentage || 0,
               totalCredits: 120,
             }}
+            dashboardData={dashboardData}
+            onAttendanceClick={() => setIsAttendanceDialogOpen(true)}
+            onAssignmentsClick={() => setActiveDetailView("assignments")}
+            onPresentationsClick={() => setActiveDetailView("presentations")}
           />
 
           {/* Urgent Alerts - Added for Mobile */}
@@ -435,61 +439,114 @@ const StudentDashboard: React.FC = () => {
             )}
         </div>
 
-        {/* Quick Actions for assignments/presentations/attendance */}
+        {/* Recent Activity - Notifications */}
         <div className="px-3">
-            <h3 className="font-bold text-base text-gray-900 mb-2 px-1">Quick Actions</h3>
-            <div className="grid grid-cols-3 gap-2">
-                 <Button 
-                    onClick={() => setActiveDetailView("assignments")}
-                    className="h-20 rounded-xl bg-orange-50 hover:bg-orange-100 border border-orange-100 flex flex-col items-center justify-center gap-1 text-orange-700 shadow-sm p-1"
-                    variant="ghost"
-                 >
-                    <BookOpen className="h-5 w-5" />
-                    <span className="font-bold text-[10px]">Assignments</span>
-                 </Button>
-                 <Button 
-                    onClick={() => setActiveDetailView("presentations")}
-                    className="h-20 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-100 flex flex-col items-center justify-center gap-1 text-purple-700 shadow-sm p-1"
-                    variant="ghost"
-                 >
-                    <FileText className="h-5 w-5" />
-                    <span className="font-bold text-[10px]">Presentations</span>
-                 </Button>
-                 <Button 
-                    onClick={() => setIsAttendanceDialogOpen(true)}
-                    className="h-20 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-100 flex flex-col items-center justify-center gap-1 text-blue-700 shadow-sm p-1"
-                    variant="ghost"
-                 >
-                    <Clock className="h-5 w-5" />
-                    <span className="font-bold text-[10px]">Attendance</span>
-                 </Button>
-            </div>
-        </div>
+            <Card className="rounded-2xl border-slate-100 shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center justify-between text-base">
+                  <div className="flex items-center space-x-2">
+                    <BookOpen className="h-4 w-4" />
+                    <span>Recent Activity</span>
+                  </div>
+                  <Badge variant="secondary" className="text-xs">
+                    {dashboardData.assignments.pending.length +
+                      (dashboardData.presentations.pending?.length || 0)}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {dashboardData.assignments.pending.length === 0 &&
+                (dashboardData.presentations.pending?.length || 0) === 0 ? (
+                  <div className="text-center py-6">
+                    <CheckCircle className="h-10 w-10 text-green-500 mx-auto mb-3" />
+                    <p className="text-sm text-gray-600 font-medium">All tasks completed!</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {dashboardData.assignments.pending
+                      .slice(0, 3)
+                      .map((assignment) => (
+                        <div
+                          key={assignment._id}
+                          className="flex flex-col md:flex-row items-start justify-between gap-2 p-3 bg-blue-50 rounded-xl border border-blue-100"
+                        >
+                          <div className="flex-1 w-full">
+                            <div className="flex flex-wrap items-center gap-2 mb-1">
+                              <h4 className="font-bold text-sm text-slate-900">{assignment.title}</h4>
+                              <Badge variant="outline" className="text-[9px] h-4 px-1.5 shrink-0">
+                                Assignment
+                              </Badge>
+                              {assignment.isUrgent && (
+                                <Badge variant="destructive" className="text-[9px] h-4 px-1.5 shrink-0">
+                                  Urgent
+                                </Badge>
+                              )}
+                            </div>
+                            {assignment.subject && (
+                              <p className="text-xs text-gray-600 font-medium">
+                                {assignment.subject}
+                              </p>
+                            )}
+                            {assignment.dueDate && (
+                              <p className="text-xs text-gray-500 flex items-center mt-1">
+                                <Clock className="h-3 w-3 mr-1" />
+                                Due{" "}
+                                {new Date(
+                                  assignment.dueDate
+                                ).toLocaleDateString()}
+                              </p>
+                            )}
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openSubmissionModal(assignment)}
+                            className="w-full md:w-auto h-7 text-xs"
+                          >
+                            Complete
+                          </Button>
+                        </div>
+                      ))}
 
-        {/* Subject Results List */}
-        <div className="px-3">
-            <h3 className="font-bold text-base text-gray-900 mb-2 px-1">Recent Results</h3>
-            <div className="space-y-2">
-               {/* Mocking subject data if not present in dashboardData or valid */}
-               {dashboardData.subjectPerformance && dashboardData.subjectPerformance.length > 0 ? (
-                 dashboardData.subjectPerformance.map((subject, idx) => (
-                    <div key={idx} className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between">
-                        <div>
-                            <h4 className="font-bold text-sm text-slate-900">{subject.subject}</h4>
-                            <p className="text-[10px] text-slate-500 font-medium">Credits: 4</p>
+                    {dashboardData.presentations.pending
+                      ?.slice(0, 2)
+                      .map((presentation) => (
+                        <div
+                          key={presentation._id}
+                          className="flex flex-col md:flex-row items-start justify-between gap-2 p-3 bg-purple-50 rounded-xl border border-purple-100"
+                        >
+                          <div className="flex-1 w-full">
+                            <div className="flex flex-wrap items-center gap-2 mb-1">
+                              <h4 className="font-bold text-sm text-slate-900">
+                                {presentation.title}
+                              </h4>
+                              <Badge
+                                variant="outline"
+                                className="text-[9px] h-4 px-1.5 bg-white text-purple-700 border-purple-200 shrink-0"
+                              >
+                                Presentation
+                              </Badge>
+                            </div>
+                            {presentation.subject && (
+                              <p className="text-xs text-gray-600 font-medium">
+                                {presentation.subject}
+                              </p>
+                            )}
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openPresentationModal(presentation)}
+                            className="bg-purple-600 text-white hover:bg-purple-700 w-full md:w-auto h-7 text-xs"
+                          >
+                            Start
+                          </Button>
                         </div>
-                         <div className="flex flex-col items-end">
-                            <span className="text-lg font-black text-indigo-600">{subject.score}%</span>
-                             <span className="text-[9px] font-bold text-green-500 bg-green-50 px-1.5 py-0.5 rounded-full">
-                                Pass
-                            </span>
-                        </div>
-                    </div>
-                 ))
-               ) : (
-                 <div className="text-center py-6 text-xs text-gray-400">No recent results found.</div>
-               )}
-            </div>
+                      ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
         </div>
 
 
@@ -738,12 +795,12 @@ const StudentDashboard: React.FC = () => {
     return (
       <div className="space-y-6">
         {/* Header with Back Button */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-0">
+          <div className="flex flex-col md:flex-row items-start md:items-center space-y-4 md:space-y-0 md:space-x-4 w-full">
             <Button
               variant="outline"
               onClick={() => setActiveDetailView(null)}
-              className="flex items-center space-x-2"
+              className="flex items-center space-x-2 w-full md:w-auto justify-center md:justify-start"
             >
               <ChevronRight className="h-4 w-4 rotate-180" />
               <span>Back to Dashboard</span>
@@ -763,13 +820,13 @@ const StudentDashboard: React.FC = () => {
           <div className="lg:col-span-2">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center justify-between">
+                <CardTitle className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-0">
                   <div className="flex items-center space-x-2">
                     <FileText className="h-5 w-5" />
                     <span>All Presentations</span>
                   </div>
-                  <div className="text-right">
-                    <div className="text-sm text-gray-600">
+                  <div className="text-left md:text-right w-full md:w-auto flex flex-row md:flex-col justify-between md:justify-end items-center md:items-end">
+                    <div className="text-sm text-gray-600 mb-0 md:mb-1">
                       {dashboardData.presentations.completed} of{" "}
                       {dashboardData.presentations.total} completed
                     </div>
@@ -779,7 +836,7 @@ const StudentDashboard: React.FC = () => {
                           dashboardData.presentations.total) *
                         100
                       }
-                      className="w-32 mt-1"
+                      className="w-24 md:w-32"
                     />
                   </div>
                 </CardTitle>
@@ -1575,13 +1632,13 @@ const StudentDashboard: React.FC = () => {
         <div className="lg:col-span-2">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center justify-between">
+              <CardTitle className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-0">
                 <div className="flex items-center space-x-2">
                   <FileText className="h-5 w-5" />
                   <span>All Presentations</span>
                 </div>
-                <div className="text-right">
-                  <div className="text-sm text-gray-600">
+                <div className="text-left md:text-right w-full md:w-auto flex flex-row md:flex-col justify-between md:justify-end items-center md:items-end">
+                  <div className="text-sm text-gray-600 mb-0 md:mb-1">
                     {dashboardData.presentations.completed} of{" "}
                     {dashboardData.presentations.total} completed
                   </div>
@@ -1591,7 +1648,7 @@ const StudentDashboard: React.FC = () => {
                         dashboardData.presentations.total) *
                       100
                     }
-                    className="w-32 mt-1"
+                    className="w-24 md:w-32"
                   />
                 </div>
               </CardTitle>
@@ -1604,20 +1661,20 @@ const StudentDashboard: React.FC = () => {
                     key={presentation._id}
                     className="p-4 border border-orange-200 bg-orange-50 rounded-lg"
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-3 mb-2">
-                          <h3 className="font-medium text-lg">
+                    <div className="flex flex-col md:flex-row items-start justify-between gap-3 md:gap-4">
+                      <div className="flex-1 w-full">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                          <h3 className="font-medium text-lg break-words line-clamp-2">
                             {presentation.title}
                           </h3>
                           <Badge
                             variant="outline"
-                            className="bg-orange-100 text-orange-800"
+                            className="bg-orange-100 text-orange-800 shrink-0"
                           >
                             Pending
                           </Badge>
                           {presentation.isUrgent && (
-                            <Badge variant="destructive">Urgent</Badge>
+                            <Badge variant="destructive" className="shrink-0">Urgent</Badge>
                           )}
                         </div>
                         {presentation.subject && (
@@ -1642,7 +1699,7 @@ const StudentDashboard: React.FC = () => {
                       </div>
                       <Button
                         onClick={() => openPresentationModal(presentation)}
-                        className="bg-orange-600 hover:bg-orange-700"
+                        className="bg-orange-600 hover:bg-orange-700 w-full md:w-auto"
                       >
                         Start Working
                       </Button>
@@ -1656,15 +1713,15 @@ const StudentDashboard: React.FC = () => {
                     key={presentation._id}
                     className="p-4 border border-purple-200 bg-purple-50 rounded-lg"
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-3 mb-2">
-                          <h3 className="font-medium text-lg">
+                    <div className="flex flex-col md:flex-row items-start justify-between gap-3 md:gap-4">
+                      <div className="flex-1 w-full">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                          <h3 className="font-medium text-lg break-words line-clamp-2">
                             {presentation.title || "Presentation"}
                           </h3>
                           <Badge
                             variant="outline"
-                            className="bg-purple-100 text-purple-800"
+                            className="bg-purple-100 text-purple-800 shrink-0"
                           >
                             {presentation.status}
                           </Badge>
@@ -1681,7 +1738,7 @@ const StudentDashboard: React.FC = () => {
                       </div>
                       <Button
                         onClick={() => openPresentationModal(presentation)}
-                        className="bg-purple-600 hover:bg-purple-700"
+                        className="bg-purple-600 hover:bg-purple-700 w-full md:w-auto"
                       >
                         Mark Complete
                       </Button>

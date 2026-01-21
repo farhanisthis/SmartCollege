@@ -1,7 +1,7 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Bell, User, TrendingUp, Award } from "lucide-react";
-import { format } from "date-fns";
+import { Bell, User, TrendingUp } from "lucide-react";
+import PerformanceBox from "@/components/performance/performance-box";
 
 interface MobilePerformanceHeaderProps {
   stats: {
@@ -9,9 +9,19 @@ interface MobilePerformanceHeaderProps {
     attendance: number;
     totalCredits: number;
   };
+  dashboardData: any;
+  onAttendanceClick: () => void;
+  onAssignmentsClick: () => void;
+  onPresentationsClick: () => void;
 }
 
-export function MobilePerformanceHeader({ stats }: MobilePerformanceHeaderProps) {
+export function MobilePerformanceHeader({ 
+  stats, 
+  dashboardData,
+  onAttendanceClick,
+  onAssignmentsClick,
+  onPresentationsClick
+}: MobilePerformanceHeaderProps) {
   return (
     <div className="space-y-4">
       {/* Top Bar */}
@@ -36,41 +46,47 @@ export function MobilePerformanceHeader({ stats }: MobilePerformanceHeaderProps)
         </div>
       </div>
 
-      {/* Greeting - Compact */}
-       <div>
-        <h2 className="text-2xl font-black text-slate-900 tracking-tight">Your Progress</h2>
-      </div>
-
-      {/* Stats Grid - Compact */}
+      {/* 2x2 Grid of Performance Boxes */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-[#eff6ff] p-4 rounded-3xl border border-blue-50/50">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="p-1 bg-blue-100 rounded-md">
-                <Award className="h-3 w-3 text-blue-600" />
-            </div>
-            <p className="text-[9px] font-black text-blue-500 uppercase tracking-widest">
-                CGPA
-            </p>
-          </div>
-          <div className="flex items-baseline gap-1">
-            <span className="text-3xl font-black text-blue-600">{stats.cgpa}</span>
-            <span className="text-[10px] font-bold text-blue-400">/ 10</span>
-          </div>
-        </div>
-        
-        <div className="bg-[#f0fdf4] p-4 rounded-3xl border border-green-50/50">
-           <div className="flex items-center gap-2 mb-1">
-            <div className="p-1 bg-green-100 rounded-md">
-                <TrendingUp className="h-3 w-3 text-green-600" />
-            </div>
-            <p className="text-[9px] font-black text-green-500 uppercase tracking-widest">
-                Attendance
-            </p>
-          </div>
-          <div className="flex items-baseline gap-1">
-            <span className="text-3xl font-black text-green-600">{stats.attendance}%</span>
-          </div>
-        </div>
+        <PerformanceBox
+            type="attendance"
+            title="Attendance"
+            data={{ percentage: dashboardData.attendance.percentage }}
+            alertThreshold={75}
+            onClick={onAttendanceClick}
+            compact={true}
+        />
+        <PerformanceBox
+            type="assignments"
+            title="Assignments"
+            data={{
+                completion: dashboardData.assignments.completion,
+                submitted: dashboardData.assignments.submitted,
+                total: dashboardData.assignments.total
+            }}
+            alertThreshold={80}
+            onClick={onAssignmentsClick}
+            compact={true}
+        />
+        <PerformanceBox
+            type="presentations"
+            title="Pres"
+             data={{
+                completion: dashboardData.presentations.completion,
+                completed: dashboardData.presentations.completed,
+                total: dashboardData.presentations.total
+             }}
+            alertThreshold={80}
+            onClick={onPresentationsClick}
+            compact={true}
+        />
+        <PerformanceBox
+            type="overall"
+            title="Overall"
+            data={{ score: dashboardData.overall.score }}
+            alertThreshold={70}
+            compact={true}
+        />
       </div>
     </div>
   );

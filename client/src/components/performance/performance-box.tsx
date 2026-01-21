@@ -18,6 +18,7 @@ interface PerformanceBoxProps {
   };
   alertThreshold?: number;
   onClick?: () => void;
+  compact?: boolean;
 }
 
 const getIconForType = (type: string) => {
@@ -48,6 +49,7 @@ const PerformanceBox: React.FC<PerformanceBoxProps> = ({
   data,
   alertThreshold = 70,
   onClick,
+  compact = false,
 }) => {
   const primaryValue = data.percentage || data.completion || data.score || 0;
   const isLowPerformance = primaryValue < alertThreshold;
@@ -118,8 +120,8 @@ const PerformanceBox: React.FC<PerformanceBoxProps> = ({
       }`}
       onClick={onClick}
     >
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-gray-600">
+      <CardHeader className={`flex flex-row items-center justify-between space-y-0 ${compact ? 'pb-1 p-3' : 'pb-2'}`}>
+        <CardTitle className={`${compact ? 'text-xs' : 'text-sm'} font-medium text-gray-600 truncate mr-2`}>
           {title}
         </CardTitle>
         <div className="flex items-center space-x-2">
@@ -129,11 +131,11 @@ const PerformanceBox: React.FC<PerformanceBoxProps> = ({
           )}
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className={compact ? 'p-3 pt-0' : ''}>
         <div className="flex items-center justify-between">
           <div className="flex items-baseline space-x-2">
             <span
-              className={`text-3xl font-bold ${getStatusColor(
+              className={`${compact ? 'text-2xl' : 'text-3xl'} font-bold ${getStatusColor(
                 primaryValue,
                 alertThreshold
               )}`}
