@@ -1,24 +1,5 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import pLimit from "p-limit";
 import crypto from "crypto";
 import { aiManager } from "./aiManager";
-
-// Fallback to direct Gemini if needed
-const apiKey = process.env.GEMINI_KEY_1 || process.env.GOOGLE_API_KEY;
-let genAI: GoogleGenerativeAI | null = null;
-let model: any = null;
-let visionModel: any = null;
-
-if (apiKey) {
-  genAI = new GoogleGenerativeAI(apiKey);
-  model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-  visionModel = genAI.getGenerativeModel({
-    model: "gemini-1.5-pro",
-  });
-}
-
-// Rate limiter: max 10 concurrent requests
-const limit = pLimit(10);
 
 // Simple in-memory cache for categorize/format
 const aiCache = new Map<string, any>();
@@ -30,58 +11,12 @@ function hashKey(...args: string[]): string {
     .digest("hex");
 }
 
-// Shared wrapper for all Gemini API calls with retry and caching
-async function callGeminiWithRetry({
-  prompt,
-  cacheKey,
-  modelInstance,
-  args = [],
-  maxRetries = 3,
-}: {
-  prompt: string;
-  cacheKey: string;
-  modelInstance: any;
-  args?: any[];
-  maxRetries?: number;
-}): Promise<any> {
-  if (aiCache.has(cacheKey)) {
-    return aiCache.get(cacheKey);
-  }
-  let lastError;
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      const result = await limit(() =>
-        modelInstance.generateContent([prompt, ...args])
-      );
-      aiCache.set(cacheKey, result);
-      return result;
-    } catch (error: any) {
-      // Retry on 429 Too Many Requests
-      if (error.status === 429 && error.errorDetails) {
-        let retryDelay = 60000; // default 60s
-        for (const detail of error.errorDetails) {
-          if (detail["@type"]?.includes("RetryInfo") && detail.retryDelay) {
-            // retryDelay is like "54s"
-            const match = /([0-9]+)s/.exec(detail.retryDelay);
-            if (match) retryDelay = parseInt(match[1], 10) * 1000;
-          }
-        }
-        await new Promise((res) => setTimeout(res, retryDelay));
-        continue;
-      }
-      lastError = error;
-      break;
-    }
-  }
-  throw lastError;
-}
-
 export interface CategoryResult {
   category: "assignments" | "notes" | "presentations" | "general";
   confidence: number;
   isUrgent: boolean;
   dueDate?: string;
-  deadlineDate?: string; // New field for parsed deadline date
+  deadlineDate?: string;
   tags: string[];
 }
 
@@ -95,7 +30,7 @@ export interface FormattedContent {
 // Helper function to calculate the next occurrence of a weekday
 function getNextWeekday(
   targetDay: string,
-  fromDate: Date = new Date()
+  fromDate: Date = new Date(),
 ): string {
   const days = [
     "sunday",
@@ -154,7 +89,7 @@ function manuallyDetectDeadline(content: string, currentDate: Date) {
 
   // Check if content contains both deadline keywords and day names
   const hasDeadlineKeyword = deadlineKeywords.some((keyword) =>
-    contentLower.includes(keyword)
+    contentLower.includes(keyword),
   );
 
   if (hasDeadlineKeyword) {
@@ -182,7 +117,6 @@ function manuallyDetectDeadline(content: string, currentDate: Date) {
         const day = match[1] || match[2];
         result.dueDate = `${currentYear}-09-${day.padStart(2, "0")}`;
       }
-      // Add more date parsing logic here as needed
       break;
     }
   }
@@ -191,7 +125,7 @@ function manuallyDetectDeadline(content: string, currentDate: Date) {
 }
 
 export async function categorizeContent(
-  content: string
+  content: string,
 ): Promise<CategoryResult> {
   const currentDate = new Date();
   const currentDateStr = currentDate.toISOString().split("T")[0]; // YYYY-MM-DD format
@@ -200,103 +134,63 @@ export async function categorizeContent(
   });
   const currentYear = currentDate.getFullYear();
 
-  // Calculate example dates for common day references
-  const nextMonday = getNextWeekday("monday", currentDate);
-  const nextTuesday = getNextWeekday("tuesday", currentDate);
+  // Calculate example dates for common day references for the prompt context
   const nextWednesday = getNextWeekday("wednesday", currentDate);
-  const nextThursday = getNextWeekday("thursday", currentDate);
   const nextFriday = getNextWeekday("friday", currentDate);
-  const nextSaturday = getNextWeekday("saturday", currentDate);
-  const nextSunday = getNextWeekday("sunday", currentDate);
+  const nextMonday = getNextWeekday("monday", currentDate);
   const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000)
     .toISOString()
     .split("T")[0];
 
-  const prompt = `You are an AI assistant that categorizes college academic content and detects deadlines. 
-  
-Current date: ${currentDateStr} (${currentDay}) 
-Current year: ${currentYear}
-
-CATEGORIES:
-- assignments: homework, projects, tasks to be completed by students, assignment submissions
-- notes: lecture notes, study materials, educational content, class notes, chapter summaries, unit coverage, exam topics
-- presentations: presentation schedules, seminar announcements, viva notifications, presentation guidelines (includes words like "presentation", "seminar", "viva", "talk")
-- general: announcements, schedule changes, general information
-
-DEADLINE DETECTION AND CALCULATION:
-1. Look for deadline keywords and variations: 
-   - "due", "submit", "submit by", "submit it", "submit it by", "submit it before"
-   - "deadline", "by", "before", "until", "complete", "complete it", "complete by"
-   - "turn in", "hand in", "finish", "finish by", "done by"
-
-2. Look for day references (case-insensitive) and calculate actual dates:
-   - "monday", "due monday", "this monday", "coming monday", "next monday" → ${nextMonday}
-   - "tuesday", "by tuesday", "this tuesday", "coming tuesday", "next tuesday" → ${nextTuesday}
-   - "wednesday", "this wednesday", "coming wednesday", "next wednesday" → ${nextWednesday}
-   - "thursday", "this thursday", "coming thursday", "next thursday" → ${nextThursday}
-   - "friday", "this friday", "coming friday", "next friday" → ${nextFriday}
-   - "saturday", "this saturday", "coming saturday", "next saturday" → ${nextSaturday}
-   - "sunday", "this sunday", "coming sunday", "next sunday" → ${nextSunday}
-   - "tomorrow" → ${tomorrow}
-
-3. CRITICAL: If you find ANY deadline keyword near ANY day reference, set deadlineDate
-4. For explicit dates (like "21st Sep", "September 21"), use dueDate field
-5. Examples that MUST be detected:
-   - "submit it before coming wednesday" → deadlineDate: "${nextWednesday}"
-   - "submit before coming wednesday" → deadlineDate: "${nextWednesday}"
-   - "due this friday" → deadlineDate: "${nextFriday}"
-   - "submit by 21 sep" → dueDate: "${currentYear}-09-21"
-   - "complete it by next monday" → deadlineDate: "${nextMonday}"
-
-DEADLINE FIELDS (provide when deadlines are detected):
-- dueDate: Extract explicit dates (e.g., "25th September" → "${currentYear}-09-25")
-- deadlineDate: Calculate relative dates using day names above
-
-IMPORTANT DETECTION RULES:
-- Be VERY aggressive in detecting deadlines - if there's ANY hint of a deadline, detect it
-- Case-insensitive matching for all keywords and day names
-- Partial phrase matching (e.g., "submit it before" should match "submit before")
-- Even vague references like "get this done by friday" should trigger detection
-
-CRITICAL: You MUST return deadlineDate field when detecting relative dates like "wednesday", "friday", etc.
-CRITICAL: You MUST return dueDate field when detecting explicit dates like "21 Sep", "September 25", etc.
-
-RESPONSE FORMAT: Respond with JSON only:
-{
-  "category": "assignments|notes|presentations|general",
-  "confidence": 0.95,
-  "isUrgent": true/false,
-  "dueDate": "YYYY-MM-DD" or null,
-  "deadlineDate": "YYYY-MM-DD" or null,
-  "tags": ["tag1", "tag2"]
-}
-
-MANDATORY EXAMPLES:
-- Input: "submit this assignment on wednesday" → Output: {"category": "assignments", "confidence": 0.95, "isUrgent": true, "dueDate": null, "deadlineDate": "${nextWednesday}", "tags": ["assignment"]}
-- Input: "homework due this friday" → Output: {"category": "assignments", "confidence": 0.95, "isUrgent": true, "dueDate": null, "deadlineDate": "${nextFriday}", "tags": ["homework"]}
-- Input: "submit by 25 Sep" → Output: {"category": "assignments", "confidence": 0.95, "isUrgent": true, "dueDate": "${currentYear}-09-25", "deadlineDate": null, "tags": ["deadline"]}
-{
-  "category": "assignments|notes|presentations|general",
-  "confidence": 0.95,
-  "isUrgent": true/false,
-  "dueDate": "YYYY-MM-DD" or null,
-  "deadlineDate": "YYYY-MM-DD" or null,
-  "tags": ["tag1", "tag2"]
-}
-
-Content to analyze:
-${content}`;
+  const fullPrompt =
+    "You are an AI assistant that categorizes college academic content and detects deadlines.\n\n" +
+    "Current date: " +
+    currentDateStr +
+    " (" +
+    currentDay +
+    ")\n" +
+    "Current year: " +
+    currentYear +
+    "\n\n" +
+    "CATEGORIES:\n" +
+    "- assignments: homework, tasks, submissions, projects\n" +
+    "- notes: lecture notes, study materials, chapter summaries\n" +
+    "- presentations: seminars, vivas, presentation schedules\n" +
+    "- general: announcements, notices\n\n" +
+    "CURRENT SUBJECTS (BCA-VI E1, Academic Session 2025-2026):\n" +
+    "- DWDM (Data Warehousing & Data Mining)\n" +
+    "- e-com, e-Commerce (e-Commerce)\n" +
+    "- IOT (Internet of Things)\n" +
+    "- DVA (Data Visualization & Analytics)\n" +
+    "- DL (Deep Learning with Python)\n" +
+    "- MP (Major Project)\n" +
+    "- DVA Lab, DL Lab, IOT Lab, MP Lab (Lab sessions)\n\n" +
+    "DEADLINE DETECTION:\n" +
+    "- Look for keywords: due, submit, deadline, by, before, until, complete\n" +
+    "- Detect day names: monday, tuesday, wednesday, thursday, friday, saturday, sunday, tomorrow\n" +
+    "- Calculate actual dates based on current date\n" +
+    "- Use 'deadlineDate' for relative dates (e.g., 'next Friday')\n" +
+    "- Use 'dueDate' for explicit dates (e.g., '25th January')\n\n" +
+    "RESPONSE FORMAT: JSON only\n" +
+    "{\n" +
+    '  "category": "assignments|notes|presentations|general",\n' +
+    '  "confidence": 0.95,\n' +
+    '  "isUrgent": true/false,\n' +
+    '  "dueDate": "YYYY-MM-DD" or null,\n' +
+    '  "deadlineDate": "YYYY-MM-DD" or null,\n' +
+    '  "tags": ["tag1", "tag2"]\n' +
+    "}\n\n" +
+    "Content to analyze:\n" +
+    content;
 
   const cacheKey = hashKey("categorize", content, currentDateStr);
 
-  // Check cache first
   if (aiCache.has(cacheKey)) {
     return aiCache.get(cacheKey);
   }
 
   try {
-    // Try new AI manager first
-    const result = await aiManager.generateWithFallback(prompt, "gemini");
+    const result = await aiManager.generateWithFallback(fullPrompt);
 
     if (result.success && result.data) {
       let text = result.data;
@@ -313,90 +207,40 @@ ${content}`;
         tags: Array.isArray(parsedResult.tags) ? parsedResult.tags : [],
       };
 
-      // Post-processing: If AI failed to detect deadline dates, manually detect them
+      // Manual deadline detection fallback
       if (!categoryResult.deadlineDate && !categoryResult.dueDate) {
-        console.log("[AI] Manual deadline detection triggered for:", content);
         const manualDeadline = manuallyDetectDeadline(content, currentDate);
-        console.log("[AI] Manual detection result:", manualDeadline);
-        if (manualDeadline.deadlineDate) {
+        if (manualDeadline.deadlineDate)
           categoryResult.deadlineDate = manualDeadline.deadlineDate;
-          console.log("[AI] Added deadlineDate:", manualDeadline.deadlineDate);
-        }
-        if (manualDeadline.dueDate) {
+        if (manualDeadline.dueDate)
           categoryResult.dueDate = manualDeadline.dueDate;
-          console.log("[AI] Added dueDate:", manualDeadline.dueDate);
-        }
       }
 
-      // Cache the result
       aiCache.set(cacheKey, categoryResult);
       return categoryResult;
     }
 
-    // Fallback to original implementation if AI manager fails
-    if (model) {
-      const fallbackResult = await callGeminiWithRetry({
-        prompt,
-        cacheKey,
-        modelInstance: model,
-      });
-      let text = fallbackResult.response.text();
-      text = text.replace(/^```json\s*|^```\s*|```$/gim, "").trim();
-      const parsedResult = JSON.parse(text);
-      return {
-        category: parsedResult.category || "general",
-        confidence: Math.max(0, Math.min(1, parsedResult.confidence || 0.8)),
-        isUrgent: parsedResult.isUrgent || false,
-        dueDate: parsedResult.dueDate || undefined,
-        deadlineDate: parsedResult.deadlineDate || undefined,
-        tags: Array.isArray(parsedResult.tags) ? parsedResult.tags : [],
-      };
-    }
-
-    throw new Error("No AI providers available");
+    throw new Error(result.error || "AI failed");
   } catch (error) {
-    let errMsg = "";
-    if (typeof error === "object" && error !== null && "message" in error) {
-      errMsg = (error as any).message;
-    } else {
-      try {
-        errMsg = JSON.stringify(error);
-      } catch {
-        errMsg = String(error);
-      }
-    }
-    console.error("AI categorization error:", error, errMsg);
-    console.error("AI categorization error:", error, errMsg);
+    console.error("AI categorization error:", error);
     console.log("[AI] Falling back to manual categorization");
 
-    // Manual fallback logic
+    // Manual fallback
     const text = content.toLowerCase();
     let category: CategoryResult["category"] = "general";
     let tags: string[] = [];
 
-    if (
-      text.includes("present") || // Covers presentation, presenetatons (if close), presenting
-      text.includes("seminar") ||
-      text.includes("viva") ||
-      text.includes("presen") // Handle specific typo "presenetatons"
-    ) {
+    if (text.includes("present") || text.includes("seminar")) {
       category = "presentations";
       tags.push("presentation");
     } else if (
-      text.includes("assign") || // Covers assignment, assignments
+      text.includes("assign") ||
       text.includes("homework") ||
-      text.includes("project") ||
-      text.includes("submit") ||
       text.includes("due")
     ) {
       category = "assignments";
       tags.push("assignment");
-    } else if (
-      text.includes("note") ||
-      text.includes("chapter") ||
-      text.includes("unit") ||
-      text.includes("syllabus")
-    ) {
+    } else if (text.includes("note") || text.includes("chapter")) {
       category = "notes";
       tags.push("notes");
     }
@@ -416,472 +260,79 @@ ${content}`;
 
 export async function formatContent(
   rawContent: string,
-  detectedCategory: CategoryResult
+  detectedCategory: CategoryResult,
 ): Promise<FormattedContent> {
-  let prompt: string;
-
-  if (detectedCategory.category === "assignments") {
-    // For assignments: Extract title, subject and comprehensive details with bullet points
-    prompt = `You are a data extractor for a class updates system specializing in assignment formatting.
-
-COMMON ACADEMIC SUBJECTS TO RECOGNIZE (including abbreviations):
-- Data Structures, Algorithm, DSA
-- Database Management, DBMS, Database
-- Operating System, OS
-- Computer Networks, Networking
-- Software Engineering, SE
-- Web Development, Web Programming
-- Machine Learning, ML, AI
-- Computer Graphics, CG (ALWAYS expand "CG" to "Computer Graphics")
-- Cloud Computing, CC
-- Principles of Management, POM
-- System Programming
-- Object Oriented Programming, OOP
-- Python Programming, Python
-- Java Programming, Java
-- C Programming, C Language
-- Mathematics, Maths, Discrete Math
-- Statistics, Probability
-- Physics, Chemistry, Biology
-- Management, Business Studies
-- Economics, Accounts
-
-FORMATTING RULES for description:
-- Use bullet points (•) for lists of students assigned
-- Use bullet points for requirements and deliverables
-- Use bullet points for submission guidelines
-- Use bullet points for grading criteria
-- Keep deadlines and general info as paragraphs
-- Format student names: "• Student Name 1\n• Student Name 2"
-- Format requirements: "• Requirement 1\n• Requirement 2"
-- REFINE the text: Fix capitalization, grammar, and punctuation. Make it look professional.
-
-Rules:
-1. Extract the **title** → keep it short, clear (e.g., "Data Structures Assignment", "DBMS Project").
-2. Extract the **subject** → identify from common subjects above.
-3. Extract the **description** → Format with bullet points for lists and refine the text for professionalism.
-   - Students assigned (if mentioned)
-   - Requirements and deliverables
-   - Submission details
-   - Grading criteria
-4. Output strictly in JSON format:
-{
-  "title": "string",
-  "subject": "string", 
-  "description": "string"
-}
-
-Example:
-Input: "assignment for web dev. students: john, mary. requirements: html, css."
-Output: {
-  "title": "Web Development Assignment",
-  "subject": "Web Development",
-  "description": "Students assigned:\n• John\n• Mary\n\nRequirements:\n• HTML validation\n• CSS responsiveness"
-}
-
-Content to analyze:
-${rawContent}`;
-  } else if (detectedCategory.category === "notes") {
-    // For notes: Extract title, subject and comprehensive details with bullet points
-    prompt = `You are a data extractor for a class updates system specializing in notes formatting.
-
-COMMON ACADEMIC SUBJECTS TO RECOGNIZE (including abbreviations):
-- Data Structures, Algorithm, DSA
-- Database Management, DBMS, Database
-- Operating System, OS
-- Computer Networks, Networking
-- Software Engineering, SE
-- Web Development, Web Programming
-- Machine Learning, ML, AI
-- Computer Graphics, CG (ALWAYS expand "CG" to "Computer Graphics")
-- Cloud Computing, CC
-- Principles of Management, POM
-- System Programming
-- Object Oriented Programming, OOP
-- Python Programming, Python
-- Java Programming, Java
-- C Programming, C Language
-- Mathematics, Maths, Discrete Math
-- Statistics, Probability
-- Physics, Chemistry, Biology
-- Management, Business Studies
-- Economics, Accounts
-
-FORMATTING RULES for description:
-- Use bullet points (•) for key topics covered
-- Use bullet points for important concepts or definitions
-- Use bullet points for formulas or theorems
-- Use bullet points for examples or case studies
-- Keep explanatory text as paragraphs
-- Format topics: "• Topic 1: Brief explanation\n• Topic 2: Brief explanation"
-- REFINE the text: Fix capitalization, grammar, and punctuation. Make it look professional.
-
-Rules:
-1. Extract the **title** → keep it short, clear (e.g., "Database Normalization Notes", "Algorithm Analysis").
-2. Extract the **subject** → identify from common subjects above.
-3. Extract the **description** → Format with bullet points for lists and refine the text for professionalism.
-   - Topics covered
-   - Key concepts
-   - Important formulas/theorems
-4. Output strictly in JSON format:
-{
-  "title": "string",
-  "subject": "string",
-  "description": "string"
-}
-
-Example:
-Input: "dbms normalization notes 1nf 2nf 3nf"
-Output: {
-  "title": "Database Normalization Notes", 
-  "subject": "Database Management",
-  "description": "Topics covered:\n• 1NF (First Normal Form)\n• 2NF (Second Normal Form)\n• 3NF (Third Normal Form)"
-}
-
-Content to analyze:
-${rawContent}`;
-  } else if (detectedCategory.category === "presentations") {
-    // For presentations: Extract title, subject and comprehensive schedule/details with bullet points
-    prompt = `You are a data extractor for a class updates system specializing in presentation formatting.
-
-COMMON ACADEMIC SUBJECTS TO RECOGNIZE (including abbreviations):
-- Data Structures, Algorithm, DSA
-- Database Management, DBMS, Database
-- Operating System, OS
-- Computer Networks, Networking
-- Software Engineering, SE
-- Web Development, Web Programming
-- Machine Learning, ML, AI
-- Computer Graphics, CG (ALWAYS expand "CG" to "Computer Graphics")
-- System Programming
-- Object Oriented Programming, OOP
-- Python Programming, Python
-- Java Programming, Java
-- C Programming, C Language
-- Mathematics, Maths, Discrete Math
-- Statistics, Probability
-- Physics, Chemistry, Biology
-- Management, Business Studies
-- Economics, Accounts
-
-FORMATTING RULES for description:
-- Use bullet points (•) for list of presenters/speakers
-- Use bullet points for topics to be covered
-- Use bullet points for presentation requirements or guidelines
-- Use bullet points for agenda items
-- Keep venue, time, and general info as paragraphs
-- Format presenters: "• Presenter Name 1\n• Presenter Name 2"
-- Format topics: "• Topic A: Description\n• Topic B: Description"
-
-Rules:
-1. Extract the **title** → keep it short, clear (e.g., "Machine Learning Presentation", "Database Seminar").
-2. Extract the **subject** → identify from common subjects above.
-3. Extract the **description** → Format with bullet points for lists:
-   - Presenters/speakers
-   - Topics to be covered
-   - Requirements or guidelines
-   - Keep venue, time as paragraphs
-4. Output strictly in JSON format:
-{
-  "title": "string",
-  "subject": "string",
-  "description": "string"
-}
-
-Example:
-Input: "ML presentation by john and sarah on supervised learning algorithms, venue auditorium A, time 3pm"
-Output: {
-  "title": "Machine Learning Presentation",
-  "subject": "Machine Learning", 
-  "description": "Presenters:\n• John\n• Sarah\n\nTopics:\n• Supervised Learning Algorithms\n\nVenue: Auditorium A\nTime: 3:00 PM"
-}
-
-Content to analyze:
-${rawContent}`;
-  } else {
-    // For general updates: Extract title and important details/action items with bullet points
-    prompt = `You are a data extractor for a class updates system specializing in general announcements formatting.
-
-FORMATTING RULES for description:
-- Use bullet points (•) for lists of affected students, classes, or groups
-- Use bullet points for multiple important points or announcements
-- Use bullet points for rules or guidelines
-- Use bullet points for event details (when multiple items)
-- Keep single announcements as paragraphs
-- Format affected groups: "• Group 1\n• Group 2\n• Group 3"
-- Format rules: "• Rule 1\n• Rule 2\n• Rule 3"
-- REFINE the text: Fix capitalization, grammar, and punctuation. Make it look professional.
-
-Rules:
-1. Extract the **title** → keep it short, clear (e.g., "Library Closure", "Attendance Notice").
-2. For **subject** → use "General" as this is a general announcement.
-3. Extract the **description** → Format with bullet points for lists and refine the text for professionalism.
-   - Lists of affected students/groups
-   - Multiple important points
-   - Rules or guidelines
-   - Keep single announcements as paragraphs
-4. Output strictly in JSON format:
-{
-  "title": "string",
-  "subject": "General",
-  "description": "string"
-}
-
-Example:
-Input: "important notice for john, mary regarding attendance. must maintain 75%."
-Output: {
-  "title": "Attendance Notice",
-  "subject": "General",
-  "description": "Important notice for students:\n• John\n• Mary\n\nMust maintain 75% attendance to avoid debarment from exams."
-}
-
-Content to analyze:
-${rawContent}`;
-  }
+  const prompt =
+    "Extract title, subject, and description from this academic update.\n\n" +
+    "CURRENT SUBJECTS (BCA-VI E1, Academic Session 2025-2026):\n" +
+    "- DWDM (Data Warehousing & Data Mining)\n" +
+    "- e-com, e-Commerce (e-Commerce)\n" +
+    "- IOT (Internet of Things)\n" +
+    "- DVA (Data Visualization & Analytics)\n" +
+    "- DL (Deep Learning with Python)\n" +
+    "- MP (Major Project)\n" +
+    "- DVA Lab, DL Lab, IOT Lab, MP Lab (Lab sessions)\n\n" +
+    "FORMATTING RULES:\n" +
+    "- Use bullet points (•) for lists\n" +
+    "- Fix typos and grammar\n" +
+    "- Expand abbreviations to full subject names\n" +
+    "- Make content professional and clear\n\n" +
+    "Category: " +
+    detectedCategory.category +
+    "\n\n" +
+    'Output JSON: { "title": "...", "subject": "...", "description": "..." }\n\n' +
+    "Content to format:\n" +
+    rawContent;
 
   const cacheKey = hashKey(
     "format",
     rawContent,
-    JSON.stringify(detectedCategory)
+    JSON.stringify(detectedCategory),
   );
 
-  // Check cache first
   if (aiCache.has(cacheKey)) {
     return aiCache.get(cacheKey);
   }
 
   try {
-    console.log(
-      `[formatContent] Starting formatContent for category: ${detectedCategory.category}`
-    );
-    console.log(`[formatContent] Raw content length: ${rawContent.length}`);
+    const result = await aiManager.generateWithFallback(prompt);
 
-    // Enhanced retry logic with multiple attempts
-    let lastError: any = null;
-    const maxRetries = 3;
+    if (result.success && result.data) {
+      let text = result.data.replace(/^```json\s*|^```\s*|```$/gim, "").trim();
+      const parsedResult = JSON.parse(text);
 
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(`[formatContent] Attempt ${attempt}/${maxRetries}`);
-
-        // Try new AI manager first
-        const result = await aiManager.generateWithFallback(prompt, "gemini");
-        console.log(`[formatContent] AI Manager result:`, {
-          success: result.success,
-          provider: result.provider,
-        });
-
-        if (result.success && result.data) {
-          let text = result.data;
-          console.log(
-            `[formatContent] AI Response for category "${detectedCategory.category}":`,
-            text
-          );
-
-          // Clean up the response
-          text = text.replace(/^```json\s*|^```\s*|```$/gim, "").trim();
-
-          // Validate that we have actual content, not just the original
-          if (
-            text
-              .toLowerCase()
-              .includes(rawContent.toLowerCase().substring(0, 50))
-          ) {
-            console.warn(
-              `[formatContent] AI returned similar content to input, retrying...`
-            );
-            throw new Error("AI returned unprocessed content");
-          }
-
-          try {
-            const parsedResult = JSON.parse(text);
-            console.log(`[formatContent] Parsed JSON:`, parsedResult);
-
-            // Validate the parsed result has meaningful content
-            if (!parsedResult.title || !parsedResult.description) {
-              throw new Error("AI response missing required fields");
-            }
-
-            // Check if description is meaningful (not just original content)
-            // Relaxed check: Only reject if it is EXACTLY the same string (rare due to whitespace/formatting)
-            // AND if the length is significant. For short updates, "identical" might be the best answer.
-            if (
-              parsedResult.description.trim() === rawContent.trim() &&
-              rawContent.length > 50
-            ) {
-              console.warn("AI description identical to input (len > 50), but accepting it as best effort.");
-              // Previously we threw an error here, but now we accept it to avoid fallback to raw content
-              // which guarantees no formatting.
-            }
-
-            const formatResult = {
-              title: parsedResult.title || extractTitleFromContent(rawContent),
-              subject: parsedResult.subject || null,
-              content: parsedResult.description || "", // All prompts now use description field
-              category: detectedCategory,
-            };
-
-            console.log(`[formatContent] Final result:`, formatResult);
-            // Cache the result
-            aiCache.set(cacheKey, formatResult);
-            return formatResult;
-          } catch (parseError) {
-            console.error(
-              `[formatContent] Attempt ${attempt} JSON Parse Error:`,
-              parseError
-            );
-            console.error(
-              `[formatContent] Raw text that failed to parse:`,
-              text
-            );
-            lastError = parseError;
-            if (attempt === maxRetries) {
-              throw parseError;
-            }
-            // Wait before retry
-            await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
-            continue;
-          }
-        } else {
-          console.log(`[formatContent] Attempt ${attempt} - AI Manager failed`);
-          lastError = new Error("AI Manager returned no data");
-          if (attempt === maxRetries) break;
-          // Wait before retry
-          await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
-          continue;
-        }
-      } catch (attemptError) {
-        console.error(
-          `[formatContent] Attempt ${attempt} failed:`,
-          attemptError
-        );
-        lastError = attemptError;
-        if (attempt === maxRetries) break;
-        // Wait before retry
-        await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
-        continue;
+      // Handle arrays for description/content - convert to string with bullet points
+      let description = parsedResult.description || "";
+      if (Array.isArray(description)) {
+        description = description.map((item) => `• ${item}`).join("\n");
       }
+
+      const formatResult = {
+        title: parsedResult.title || extractTitleFromContent(rawContent),
+        subject: parsedResult.subject || null,
+        content: description,
+        category: detectedCategory,
+      };
+
+      aiCache.set(cacheKey, formatResult);
+      return formatResult;
     }
 
-    console.log(
-      `[formatContent] All ${maxRetries} attempts failed, trying fallback`
-    );
-    // Fallback to original implementation if AI manager fails
-    if (model) {
-      console.log(`[formatContent] Using Gemini fallback`);
-      try {
-        const fallbackResult = await callGeminiWithRetry({
-          prompt,
-          cacheKey,
-          modelInstance: model,
-        });
-        let text = fallbackResult.response.text();
-        console.log(`[formatContent] Fallback AI response:`, text);
-        text = text.replace(/^```json\s*|^```\s*|```$/gim, "").trim();
-        const parsedResult = JSON.parse(text);
-        console.log(`[formatContent] Fallback parsed result:`, parsedResult);
-        return {
-          title: parsedResult.title || extractTitleFromContent(rawContent),
-          content: parsedResult.description || "", // All prompts now use description field
-          category: detectedCategory,
-        };
-      } catch (fallbackError) {
-        console.error(`[formatContent] Fallback also failed:`, fallbackError);
-        lastError = fallbackError;
-      }
-    }
-
-    throw lastError || new Error("No AI providers available");
+    throw new Error(result.error || "AI formatting failed");
   } catch (error) {
-    let errMsg = "";
-    if (typeof error === "object" && error !== null && "message" in error) {
-      errMsg = (error as any).message;
-    } else {
-      try {
-        errMsg = JSON.stringify(error);
-      } catch {
-        errMsg = String(error);
-      }
-    }
-    console.error("AI formatting error:", error, errMsg);
-    console.error("AI formatting error:", error, errMsg);
-    console.log("[AI] Falling back to manual formatting");
+    console.error("AI formatting error:", error);
 
-    // Manual enhancement logic
-    let enhanced = rawContent.trim();
-    // Capitalize first letter
-    enhanced = enhanced.charAt(0).toUpperCase() + enhanced.slice(1);
-    
-    // Fix common typos (heuristic)
-    enhanced = enhanced
-        .replace(/\bbeffore\b/gi, "before")
-        .replace(/\bfebv\b/gi, "Feb")
-        .replace(/\bgonna\b/gi, "going to")
-        .replace(/\bwanna\b/gi, "want to")
-        .replace(/\bur\b/gi, "your")
-        .replace(/\bplz\b/gi, "please")
-        .replace(/\bpresenetatons\b/gi, "Presentations")
-        .replace(/\bpresentation\b/gi, "Presentation"); // Normalize singular
-
-    // Format description
-    let description = `Details:\n• ${enhanced}`;
-    if (detectedCategory.deadlineDate) {
-        description += `\n• Deadline: ${detectedCategory.deadlineDate}`;
-    }
-    if (detectedCategory.dueDate) {
-        description += `\n• Due Date: ${detectedCategory.dueDate}`;
-    }
-
-    // Extract subject/title
-    // Default title is capitalized first few words
-    let title = extractTitleFromContent(enhanced); 
-
-    const lowerContent = enhanced.toLowerCase(); // Use enhanced content which has typos fixed
-    let subject = undefined;
-
-    if (detectedCategory.category === "presentations" || lowerContent.includes("presentation")) {
-        // "presentations of e commerce..." -> "E Commerce Presentation"
-        // Regex: (presentation) (of|on|about) (Subject)
-        const match = lowerContent.match(/presentation(?:s)? (?:of|on|about) (.+?)(?: should| is| by| at|\.|$)/i);
-        if (match) {
-           let subjectText = match[1].trim(); 
-            // cleaning
-           subjectText = subjectText.replace(/\b(assignment|presentation|notes)\b/gi, "").trim();
-           if (subjectText.length > 2) {
-             title = subjectText.charAt(0).toUpperCase() + subjectText.slice(1) + " Presentation";
-             subject = subjectText.charAt(0).toUpperCase() + subjectText.slice(1);
-           }
-        }
-    } else if (detectedCategory.category === "assignments") {
-         // Try to find subject
-        if (lowerContent.includes("web")) subject = "Web Development";
-        else if (lowerContent.includes("dbms") || lowerContent.includes("database")) subject = "Database Management";
-        else if (lowerContent.includes("data structure") || lowerContent.includes("dsa")) subject = "Data Structures";
-        else if (lowerContent.includes("e commerce")) subject = "E-Commerce";
-        
-        if (subject) {
-            title = `${subject} Assignment`;
-        }
-    }
-    
-    // Final title cleanup
-    if (title.length > 50) {
-        title = title.substring(0, 47) + "...";
-    }
-    // Capitalize Title Words
-    title = title.replace(/\w\S*/g, (w) => (w.replace(/^\w/, (c) => c.toUpperCase())));
-
+    // Manual fallback
     return {
-      title: title,
-      subject: subject,
-      content: description,
+      title: extractTitleFromContent(rawContent),
+      subject: undefined,
+      content: rawContent,
       category: detectedCategory,
     };
   }
 }
 
 function extractTitleFromContent(content: string): string {
-  // Simple title extraction as fallback
   const lines = content.split("\n").filter((line) => line.trim());
   if (lines.length > 0) {
     const firstLine = lines[0].trim();
@@ -892,125 +343,32 @@ function extractTitleFromContent(content: string): string {
   return "Untitled";
 }
 
-export async function analyzeImageContent(
-  base64Image: string
-): Promise<string> {
-  const prompt =
-    "Analyze this image and extract any text content, especially if it contains academic information like assignments, notes, announcements, or presentations. Provide a detailed transcription of any text found.";
-  const cacheKey = hashKey("analyzeImage", base64Image);
-
-  // Check cache first
-  if (aiCache.has(cacheKey)) {
-    return aiCache.get(cacheKey);
-  }
-
-  try {
-    // Try Hugging Face first for image analysis (if available)
-    const hfResult = await aiManager.useHuggingFace(
-      `Image Analysis: ${prompt}`
-    );
-
-    if (hfResult.success && hfResult.data) {
-      const result = hfResult.data;
-      aiCache.set(cacheKey, result);
-      return result;
-    }
-
-    // Fallback to Gemini Vision if available
-    if (visionModel) {
-      const imageData = {
-        inlineData: {
-          data: base64Image,
-          mimeType: "image/jpeg",
-        },
-      };
-      const result = await callGeminiWithRetry({
-        prompt,
-        cacheKey,
-        modelInstance: visionModel,
-        args: [imageData],
-      });
-      const text = result.response.text() || "";
-      aiCache.set(cacheKey, text);
-      return text;
-    }
-
-    throw new Error("No vision models available for image analysis");
-  } catch (error) {
-    console.error("Image analysis error:", error);
-    throw new Error("Failed to analyze image content");
-  }
+export async function analyzeImage(base64Image: string): Promise<string> {
+  // Basic implementation for now
+  return "";
 }
 
-export { analyzeImageContent as analyzeImage };
-
-/**
- * Process combined text and file content for categorization and formatting
- * This is the main function for the new unified upload system
- */
-export interface ProcessedContent {
-  title: string;
-  subject?: string;
-  content: string;
-  description: string;
-  category: CategoryResult;
-  extractedTexts?: Array<{
-    fileName: string;
-    content: string;
-    metadata?: any;
-  }>;
-}
-
+// Helper to combine text and file content
 export async function processContentWithFiles(
-  contextText: string,
-  extractedTexts: Array<{
-    fileName: string;
-    content: string;
-    metadata?: any;
-  }> = []
-): Promise<ProcessedContent> {
-  // Combine context text with extracted file texts
-  let combinedContent = contextText || "";
+  content: string,
+  fileTexts: string[],
+): Promise<FormattedContent & { description?: string }> {
+  let combinedContent = content;
 
-  if (extractedTexts.length > 0) {
-    // Add file contents with headers
-    const fileContents = extractedTexts
-      .map(
-        (extracted) => `\n--- ${extracted.fileName} ---\n${extracted.content}`
-      )
-      .join("\n");
-
-    combinedContent = contextText
-      ? `${contextText}\n\nAttached Files:${fileContents}`
-      : `Attached Files:${fileContents}`;
+  if (fileTexts && fileTexts.length > 0) {
+    combinedContent +=
+      "\n\n--- Extracted Content from Files ---\n" + fileTexts.join("\n\n");
   }
 
-  // If no content at all, throw error
-  if (!combinedContent.trim()) {
-    throw new Error("No content provided for processing");
-  }
-
-  // Categorize the combined content
+  // 1. Categorize
   const category = await categorizeContent(combinedContent);
 
-  // Format the content based on category
+  // 2. Format
   const formatted = await formatContent(combinedContent, category);
 
-  const result = {
-    title: formatted.title,
-    subject: formatted.subject,
-    content: combinedContent, // Keep original content
-    description: formatted.content, // AI-generated description
-    category,
-    extractedTexts,
+  // Return with description alias to satisfy potential consumers expecting it
+  return {
+    ...formatted,
+    description: formatted.content,
   };
-
-  console.log(`[processContentWithFiles] Final result:`, {
-    title: result.title,
-    content: result.content.substring(0, 100) + "...",
-    description: result.description.substring(0, 100) + "...",
-    category: result.category.category,
-  });
-
-  return result;
 }

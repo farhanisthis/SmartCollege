@@ -11,6 +11,7 @@ import {
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { IStorage } from "../storage";
+import bcrypt from "bcrypt";
 import {
   UserModel,
   UpdateModel,
@@ -530,6 +531,37 @@ export class MongoStorage implements IStorage {
         presentationsDelivered: 0,
         attendancePercentage: 0,
       };
+    }
+  }
+
+  async updateUsername(userId: string, newUsername: string): Promise<User | undefined> {
+    try {
+      await this.ensureConnected();
+      const existingUser = await UserModel.findOne({ username: newUsername }).lean();
+      if (existingUser && existingUser._id !== userId) {
+        throw new Error("Username already taken");
+      }
+      const updatedUser = await UserModel.findByIdAndUpdate(userId, { username: newUsername }, { new: true }).lean();
+      return updatedUser ? this.mapUserDocument(updatedUser) : undefined;
+    } catch (error) {
+      console.error("Error updating username:", error);
+      throw error;
+    }
+  }
+
+  async updatePassword(userId: string, oldPassword: string, newPassword: string): Promise<boolean> {
+    try {
+      await this.ensureConnected();
+      const user = await UserModel.findById(userId).lean();
+      if (!user) throw new Error("User not found");
+      const isMatch = await bcrypt.compare(oldPassword, user.password).catch(() => false);
+      if (!isMatch && user.password !== oldPassword) throw new Error("Current password is incorrect");
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      await UserModel.findByIdAndUpdate(userId, { password: hashedPassword, passwordChangedAt: new Date() });
+      return true;
+    } catch (error) {
+      console.error("Error updating password:", error);
+      throw error;
     }
   }
 

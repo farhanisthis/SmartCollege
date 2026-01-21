@@ -28,32 +28,19 @@ class AIProvidersConfig {
   }
 
   private initializeProviders() {
-    // Load Hugging Face providers (5 keys for rotation)
-    for (let i = 1; i <= 5; i++) {
-      const hfKey = process.env[`HUGGINGFACE_API_KEY-${i}`];
-      if (hfKey) {
-        this.providers.push({
-          name: `HuggingFace-${i}`,
-          type: "huggingface",
-          apiKey: hfKey,
-          model: "facebook/blenderbot-400M-distill", // Better model for text processing
-          isActive: true,
-          priority: i,
-        });
-      }
-    }
+    // Hugging Face providers removed as per user request
 
-    // Load Gemini providers (MEMORY OPTIMIZED: only load first 3 keys)
-    for (let i = 1; i <= 3; i++) {
+    // Load all 16 Gemini providers for maximum availability
+    for (let i = 1; i <= 16; i++) {
       const geminiKey = process.env[`GEMINI_KEY_${i}`];
       if (geminiKey) {
         this.providers.push({
           name: `Gemini-${i}`,
           type: "gemini",
           apiKey: geminiKey,
-          model: "gemini-1.5-flash", // Updated to v1 API compatible model
+          model: "gemini-2.5-flash", // Latest fast model (Jan 2026)
           isActive: true,
-          priority: i + 5, // Priority after HuggingFace providers
+          priority: i, // Sequential priority for failover
         });
       }
     }

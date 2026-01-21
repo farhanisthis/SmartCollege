@@ -136,16 +136,16 @@ interface Student {
 }
 
 // Extract subjects for a specific day
-const getSubjectsForDay = (dayName: string) => {
+const getSubjectsForDay = (schedule: any, dayName: string) => {
   const subjects: Array<{ time: string; subject: string; bg: string }> = [];
 
-  Object.entries(E1Schedule).forEach(([timeSlot, schedule]) => {
-    const daySchedule = schedule[dayName as keyof typeof schedule];
+  Object.entries(schedule).forEach(([timeSlot, scheduleData]: [string, any]) => {
+    const daySchedule = scheduleData[dayName];
     if (
       daySchedule &&
       daySchedule.text &&
-      daySchedule.text !== "BREAK" &&
-      daySchedule.text !== ""
+      daySchedule.text !== "" &&
+      daySchedule.text !== "-"  // Only skip empty slots marked with "-"
     ) {
       subjects.push({
         time: timeSlot,
@@ -165,15 +165,60 @@ interface AttendanceStatus {
 }
 
 export default function AttendanceManager() {
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [attendance, setAttendance] = useState<AttendanceStatus>({});
+  const [date, setDate] = useState<Date>(new Date());
   const [students, setStudents] = useState<Student[]>([]);
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [attendance, setAttendance] = useState<Record<string, Record<string, string>>>({});
+  const [searchQuery, setSearchQuery] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const isMobile = useIsMobile();
+  const [timetableSlots, setTimetableSlots] = useState<any[]>([]);
+  const [timetableSchedule, setTimetableSchedule] = useState<any>(E1Schedule); // Fallback to hardcoded
+
+  // Fetch timetable from API
+  useEffect(() => {
+    const fetchTimetable = async () => {
+      try {
+        const response = await fetch("/api/timetable/E1", {
+          credentials: "include",
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.data) {
+            setTimetableSlots(data.data);
+            
+            // Build schedule object from API data
+            const schedule: Record<string, Record<string, { text: string; bg: string }>> = {};
+            
+            data.data.forEach((slot: any) => {
+              const timeKey = slot.timeSlot.replace(/ - /, "\n—\n");
+              
+              if (!schedule[timeKey]) {
+                schedule[timeKey] = {};
+              }
+              
+              schedule[timeKey][slot.day] = {
+                text: slot.subjectCode === "-" ? "" : slot.subjectCode,
+                bg: slot.subject?.color || "from-gray-600 via-gray-500 to-gray-400",
+              };
+            });
+            
+            setTimetableSchedule(schedule);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch timetable:", error);
+        // Keep using hardcoded E1Schedule as fallback
+      }
+    };
+
+    fetchTimetable();
+  }, []);
   const [studentsLoaded, setStudentsLoaded] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Custom Subjects Management
   const [isEditSubjectsOpen, setIsEditSubjectsOpen] = useState(false);
@@ -192,18 +237,19 @@ export default function AttendanceManager() {
     }
   }, [customSchedule]);
   
-  const dayName = format(selectedDate, "EEEE"); // Monday, Tuesday, etc.
+  const dayName = format(date, "EEEE"); // Monday, Tuesday, etc.
 
   // Merge default schedule with custom overrides
   const subjectsForDay = useMemo(() => {
     // If we have a custom schedule for this specific date string (YYYY-MM-DD), use it
-    const dateKey = format(selectedDate, "yyyy-MM-dd");
+    const dateKey = format(date, "yyyy-MM-dd");
     if (customSchedule[dateKey]) {
       return customSchedule[dateKey];
     }
     // Fallback to day-of-week based default schedule or custom day-of-week override if we implemented that
-    return getSubjectsForDay(dayName);
-  }, [dayName, selectedDate, customSchedule]);
+    return getSubjectsForDay(timetableSchedule, dayName);
+  }, [dayName, date, customSchedule, timetableSchedule]);
+
 
   // Temp state for editing
   const [editingSubjects, setEditingSubjects] = useState<Array<{ time: string; subject: string; bg: string }>>([]);
@@ -214,7 +260,7 @@ export default function AttendanceManager() {
   };
 
   const handleSaveSubjects = () => {
-    const dateKey = format(selectedDate, "yyyy-MM-dd");
+    const dateKey = format(date, "yyyy-MM-dd");
     setCustomSchedule(prev => ({
       ...prev,
       [dateKey]: editingSubjects
@@ -291,7 +337,7 @@ export default function AttendanceManager() {
       setIsLoading(true);
       try {
         const response = await fetch(
-          `/api/attendance/daily?date=${format(selectedDate, "yyyy-MM-dd")}`,
+          `/api/attendance/daily?date=${format(date, "yyyy-MM-dd")}`,
           {
             credentials: "include",
           }
@@ -370,7 +416,7 @@ export default function AttendanceManager() {
     };
 
     loadExistingAttendance();
-  }, [selectedDate, subjectsForDay, students, studentsLoaded]);
+  }, [date, subjectsForDay, students, studentsLoaded]);
 
   // Toggle attendance status: undefined -> present -> absent -> undefined
   const toggleAttendance = (studentId: string, subject: string) => {
@@ -475,7 +521,7 @@ export default function AttendanceManager() {
         },
         credentials: "include",
         body: JSON.stringify({
-          date: format(selectedDate, "yyyy-MM-dd"),
+          date: format(date, "yyyy-MM-dd"),
           attendance: attendancePayload,
         }),
       });
@@ -559,7 +605,7 @@ export default function AttendanceManager() {
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `attendance-${format(selectedDate, "yyyy-MM-dd")}.csv`;
+    link.download = `attendance-${format(date, "yyyy-MM-dd")}.csv`;
     link.click();
     window.URL.revokeObjectURL(url);
   };
@@ -571,8 +617,8 @@ export default function AttendanceManager() {
     if (result.success && result.data) {
       // Refresh attendance data after upload
       const uploadDate = new Date(result.data.date);
-      setSelectedDate(uploadDate);
-      // Reload attendance data will be triggered by useEffect when selectedDate changes
+      setDate(uploadDate);
+      // Reload attendance data will be triggered by useEffect when date changes
     }
   };
 
@@ -581,8 +627,8 @@ export default function AttendanceManager() {
   const [activeTab, setActiveTab] = useState<"attendance" | "timetable" | "assignments">("attendance");
   const currentActiveSubject = subjectsForDay[currentSubjectIndex];
 
-  const prevDay = () => setSelectedDate((date) => addDays(date, -1));
-  const nextDay = () => setSelectedDate((date) => addDays(date, 1));
+  const prevDay = () => setDate((date) => addDays(date, -1));
+  const nextDay = () => setDate((date) => addDays(date, 1));
 
   const handleNextSubject = () => {
     if (currentSubjectIndex < subjectsForDay.length - 1) {
@@ -638,7 +684,7 @@ export default function AttendanceManager() {
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Attendance");
-    XLSX.writeFile(wb, `Attendance_${format(selectedDate, "yyyy-MM-dd")}.xlsx`);
+    XLSX.writeFile(wb, `Attendance_${format(date, "yyyy-MM-dd")}.xlsx`);
   };
 
   if (isMobile) {
@@ -647,7 +693,7 @@ export default function AttendanceManager() {
         <div className="px-4 pt-6 space-y-6">
           <MobileAttendanceHeader
             dayName={dayName}
-            selectedDate={selectedDate}
+            date={date}
             stats={stats}
             totalStudents={students.length}
             currentSubject={currentActiveSubject}
@@ -660,7 +706,7 @@ export default function AttendanceManager() {
             hasPrev={currentSubjectIndex > 0}
             activeTab={activeTab}
             onTabChange={setActiveTab}
-            onDateSelect={setSelectedDate}
+            onDateSelect={setDate}
             onPrevDay={prevDay}
             onNextDay={nextDay}
           />
@@ -762,7 +808,7 @@ export default function AttendanceManager() {
           <DialogHeader>
             <DialogTitle>Edit Subjects</DialogTitle>
             <DialogDescription>
-              {format(selectedDate, "PPP")}
+              {format(date, "PPP")}
             </DialogDescription>
           </DialogHeader>
           
@@ -835,20 +881,20 @@ export default function AttendanceManager() {
                 variant="outline"
                 className={cn(
                   "justify-start text-left font-normal w-full md:w-[240px]", // Full width on mobile
-                  !selectedDate && "text-muted-foreground"
+                  !date && "text-muted-foreground"
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
+                {date ? format(date, "PPP") : <span>Pick a date</span>}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="end">
               <Calendar
                 mode="single"
-                selected={selectedDate}
+                selected={date}
                 onSelect={(date) => {
                   if (date) {
-                    setSelectedDate(date);
+                    setDate(date);
                     setIsCalendarOpen(false);
                   }
                 }}
@@ -900,7 +946,7 @@ export default function AttendanceManager() {
       <Dialog open={isEditSubjectsOpen} onOpenChange={setIsEditSubjectsOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit Subjects for {format(selectedDate, "PPP")}</DialogTitle>
+            <DialogTitle>Edit Subjects for {format(date, "PPP")}</DialogTitle>
             <DialogDescription>
               Customize the subjects and time slots for this specific date. Changes apply only to this day.
             </DialogDescription>
@@ -1094,7 +1140,7 @@ export default function AttendanceManager() {
                             className="text-center p-4 font-semibold text-white relative min-w-[120px]"
                           >
                             <div
-                              className={`absolute inset-0 bg-gradient-to-br ${bg} rounded-t-lg`}
+                              className={`absolute inset-0 bg-gradient-to-br ${bg} rounded-lg mx-1`}
                             />
                             <div className="relative z-10">
                               <div className="text-sm font-bold">{subject}</div>

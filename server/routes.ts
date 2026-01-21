@@ -24,6 +24,8 @@ import performanceRoutes from "./routes/performance";
 import notificationRoutes from "./routes/notifications";
 import attendanceRoutes from "./routes/attendance";
 import bulkUsersRoutes from "./routes/bulk-users";
+import subjectsRoutes from "./routes/subjects";
+import timetableRoutes from "./routes/timetable";
 import { generatePerformanceInsight, summarizeText } from "./services/gemini";
 import { compare } from "bcrypt";
 
@@ -32,7 +34,7 @@ const handleUploadError = (
   error: any,
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   if (error instanceof multer.MulterError) {
     if (error.code === "LIMIT_FILE_SIZE") {
@@ -101,16 +103,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // none for cross-site
         maxAge: 1000 * 60 * 60 * 24, // 1 day
       },
-    })
+    }),
   );
+
+  // Health check / root endpoint
+  app.get("/", (req, res) => {
+    res.json({
+      status: "ok",
+      message: "SmartCollege API Server is running",
+      version: "1.0.0",
+      timestamp: new Date().toISOString(),
+    });
+  });
+
   // Login route
   app.post("/api/auth/login", async (req, res) => {
     try {
       let { username, password } = req.body;
-      
+
       // Trim whitespace to prevent copy-paste errors
-      username = typeof username === 'string' ? username.trim() : username;
-      password = typeof password === 'string' ? password.trim() : password;
+      username = typeof username === "string" ? username.trim() : username;
+      password = typeof password === "string" ? password.trim() : password;
 
       console.log(`[Login Attempt] Username: '${username}'`);
 
@@ -119,29 +132,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .status(400)
           .json({ message: "Username and password required" });
       }
-      
+
       // Find user by username
       const user = await storage.getUserByUsername(username);
-      
+
       console.log(`[Login Attempt] User found: ${!!user}`);
-      
+
       if (!user) {
         console.log(`[Login Attempt] Failed: User not found`);
         return res
           .status(401)
           .json({ message: "Invalid username or password" });
       }
-      
+
       // Check password (support both hashed and legacy plain text)
       const isMatch = await compare(password, user.password).catch(() => false);
-      
+
       if (!isMatch && user.password !== password) {
-        console.log(`[Login Attempt] Failed: Password mismatch for user '${username}'`);
+        console.log(
+          `[Login Attempt] Failed: Password mismatch for user '${username}'`,
+        );
         return res
           .status(401)
           .json({ message: "Invalid username or password" });
       }
-      
+
       console.log(`[Login Attempt] Success for user '${username}'`);
 
       // Set session
@@ -154,7 +169,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: user.name,
           role: user.role,
           class: user.class,
-          enrollment: user.enrollment, // Include enrollment
           rollNumber: user.rollNumber, // Include rollNumber for attendance matching
         },
       });
@@ -221,6 +235,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           year: user.year,
           rollNumber: user.rollNumber,
           createdAt: user.createdAt,
+          passwordChangedAt: user.passwordChangedAt,
         },
         stats,
       });
@@ -271,6 +286,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update username
+  app.put("/api/profile/username", requireAuth, async (req, res) => {
+    try {
+      const { newUsername } = req.body;
+
+      if (!newUsername || newUsername.trim().length === 0) {
+        return res.status(400).json({ message: "Username is required" });
+      }
+
+      const updatedUser = await storage.updateUsername(req.session.userId!, newUsername.trim());
+
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Update session with new username
+      req.session.userRole = updatedUser.role;
+
+      res.json({
+        message: "Username updated successfully",
+        user: {
+          id: updatedUser.id,
+          username: updatedUser.username,
+          name: updatedUser.name,
+          role: updatedUser.role,
+          class: updatedUser.class,
+        },
+      });
+    } catch (error: any) {
+      console.error("Update username error:", error);
+      if (error.message === "Username already taken") {
+        return res.status(409).json({ message: "Username already taken" });
+      }
+      res.status(500).json({ message: "Failed to update username" });
+    }
+  });
+
+  // Change password
+  app.put("/api/profile/password", requireAuth, async (req, res) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: "Current and new passwords are required" });
+      }
+
+      if (newPassword.length < 8) {
+        return res.status(400).json({ message: "New password must be at least 8 characters" });
+      }
+
+      const success = await storage.updatePassword(req.session.userId!, currentPassword, newPassword);
+
+      if (!success) {
+        return res.status(400).json({ message: "Failed to update password" });
+      }
+
+      res.json({ message: "Password updated successfully" });
+    } catch (error: any) {
+      console.error("Update password error:", error);
+      if (error.message === "Current password is incorrect") {
+        return res.status(401).json({ message: "Current password is incorrect" });
+      }
+      res.status(500).json({ message: "Failed to update password" });
+    }
+  });
+
   // Preferences routes
   app.get("/api/preferences", requireAuth, async (req, res) => {
     try {
@@ -318,7 +399,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updatedUser = await storage.updatePreferences(
         req.session.userId!,
-        preferences
+        preferences,
       );
 
       if (!updatedUser) {
@@ -351,7 +432,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const update of updates) {
         update.hasViewed = await storage.hasUserViewed(
           req.session.userId!,
-          update.id
+          update.id,
         );
       }
 
@@ -431,7 +512,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("Delete update error:", error);
         res.status(500).json({ message: "Failed to delete update" });
       }
-    }
+    },
   );
 
   app.post(
@@ -497,8 +578,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const timeoutPromise = new Promise((_, reject) =>
           setTimeout(
             () => reject(new Error("AI pipeline timeout (30s)")),
-            30000
-          )
+            30000,
+          ),
         );
         let processed;
         try {
@@ -580,7 +661,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .status(400)
           .json({ message: "Failed to create update", error: String(error) });
       }
-    }
+    },
   );
 
   // New unified upload endpoint - handles text + multiple files
@@ -614,7 +695,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 TextExtractionService.isSupportedFileType(file.originalname)
               ) {
                 const extracted = await textExtractionService.extractText(
-                  file.path
+                  file.path,
                 );
                 extractedTexts.push({
                   fileName: file.originalname,
@@ -622,7 +703,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   metadata: extracted.metadata,
                 });
                 console.log(
-                  `[unified-upload] Extracted text from ${file.originalname}`
+                  `[unified-upload] Extracted text from ${file.originalname}`,
                 );
               } else {
                 // For unsupported file types, use filename as content
@@ -632,13 +713,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   metadata: {},
                 });
                 console.log(
-                  `[unified-upload] Unsupported file type: ${file.originalname}`
+                  `[unified-upload] Unsupported file type: ${file.originalname}`,
                 );
               }
             } catch (error) {
               console.error(
                 `[unified-upload] Error extracting text from ${file.originalname}:`,
-                error
+                error,
               );
               // Continue processing other files
               extractedTexts.push({
@@ -656,7 +737,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           processed = await processContentWithFiles(
             contextText || "",
-            extractedTexts
+            extractedTexts.map((et) => et.content),
           );
         } catch (error) {
           console.error("[unified-upload] AI processing error:", error);
@@ -669,8 +750,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Create the update
         const updateData = {
           title: processed.title,
-          content: processed.content,
-          description: processed.description,
+          content: Array.isArray(processed.content)
+            ? processed.content.map((item) => `• ${item}`).join("\n")
+            : processed.content,
+          description: Array.isArray(processed.description)
+            ? processed.description.map((item) => `• ${item}`).join("\n")
+            : processed.description,
           originalContent: contextText || "",
           category: processed.category.category,
           subject: processed.subject || null,
@@ -737,7 +822,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(201).json({
           update: completeUpdate,
           processing: {
-            extractedTexts: processed.extractedTexts?.map((et) => ({
+            extractedTexts: extractedTexts.map((et) => ({
               fileName: et.fileName,
               extractedLength: et.content.length,
             })),
@@ -751,7 +836,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           error: String(error),
         });
       }
-    }
+    },
   );
 
   // AI routes
@@ -816,7 +901,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("Image analysis error:", error);
         res.status(500).json({ message: "Failed to analyze image" });
       }
-    }
+    },
   );
 
   // --- New AI Features ---
@@ -838,7 +923,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { text } = req.body;
       if (!text) return res.status(400).send("Text is required");
-      
+
       const summary = await summarizeText(text);
       res.json({ summary });
     } catch (e: any) {
@@ -855,7 +940,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log(
-        `[ai-test] Testing AI with provider: ${provider || "auto-fallback"}`
+        `[ai-test] Testing AI with provider: ${provider || "auto-fallback"}`,
       );
       console.log(`[ai-test] Prompt: ${prompt.substring(0, 100)}...`);
 
@@ -902,12 +987,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const result = await aiManager.useGemini(
         "gemini-2.5-flash",
-        "Say hello in one word"
+        "Say hello in one word",
       );
 
       if (result.success) {
         console.log(
-          `[gemini-v1-test] ✅ SUCCESS: Using v1 API with provider: ${result.provider}`
+          `[gemini-v1-test] ✅ SUCCESS: Using v1 API with provider: ${result.provider}`,
         );
         res.json({
           success: true,
@@ -947,7 +1032,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "File request for:",
         filename,
         "from user:",
-        req.session.userId
+        req.session.userId,
       );
 
       if (!fs.existsSync(filePath)) {
@@ -972,19 +1057,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "download mode:",
         download,
         "MIME type:",
-        file?.mimeType
+        file?.mimeType,
       );
 
       // Set appropriate headers for inline viewing vs download
       if (download) {
         res.setHeader(
           "Content-Disposition",
-          `attachment; filename="${file?.originalName || filename}"`
+          `attachment; filename="${file?.originalName || filename}"`,
         );
       } else {
         res.setHeader(
           "Content-Disposition",
-          `inline; filename="${file?.originalName || filename}"`
+          `inline; filename="${file?.originalName || filename}"`,
         );
 
         // Set proper Content-Type for preview
@@ -1014,7 +1099,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "Preview request for:",
         filename,
         "from user:",
-        req.session.userId
+        req.session.userId,
       );
 
       if (!fs.existsSync(filePath)) {
@@ -1039,16 +1124,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "Serving preview file:",
         filename,
         "with MIME type:",
-        file?.mimeType
+        file?.mimeType,
       );
 
       // Send file
       res.sendFile(path.resolve(filePath));
     } catch (error) {
       console.error("File preview error:", error);
-      res.status(500).json({ message: "Failed to preview file" });
+        res.status(500).json({ message: "Failed to preview file" });
     }
   });
+
+  // Attach user info to request for authenticated routes
+  app.use((req: any, res, next) => {
+    if (req.session.userId) {
+      req.user = {
+        userId: req.session.userId,
+        role: req.session.userRole,
+      };
+    }
+    next();
+  });
+
+  // Register modular routes
+  app.use("/api/performance", performanceRoutes);
+  app.use("/api/notifications", notificationRoutes);
+  app.use("/api/attendance", attendanceRoutes);
+  app.use("/api/bulk-users", bulkUsersRoutes);
+  app.use("/api/subjects", subjectsRoutes);
+  app.use("/api/timetable", timetableRoutes);
 
   // Debug endpoint to test authentication
   app.get("/api/debug/auth", requireAuth, async (req, res) => {
@@ -1097,7 +1201,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             if (!contentToAnalyze || contentToAnalyze.trim().length < 10) {
               errors.push(
-                `Update ${update.id}: Insufficient content to analyze`
+                `Update ${update.id}: Insufficient content to analyze`,
               );
               errorCount++;
               continue;
@@ -1116,7 +1220,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             };
             const result = await formatContent(
               contentToAnalyze,
-              categoryResult
+              categoryResult,
             );
 
             if (result && result.content && result.content.trim().length > 0) {
@@ -1126,7 +1230,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               processedCount++;
             } else {
               errors.push(
-                `Update ${update.id}: AI failed to generate description`
+                `Update ${update.id}: AI failed to generate description`,
               );
               errorCount++;
             }
@@ -1134,7 +1238,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             errors.push(
               `Update ${update.id}: ${
                 error instanceof Error ? error.message : "Unknown error"
-              }`
+              }`,
             );
             errorCount++;
           }
@@ -1151,7 +1255,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("Regenerate descriptions error:", error);
         res.status(500).json({ message: "Failed to regenerate descriptions" });
       }
-    }
+    },
   );
 
   // Stats routes
@@ -1227,7 +1331,7 @@ Please provide a well-formatted, enhanced version with:
       // Try to get enhanced description using AI
       const result = await aiManager.generateWithFallback(
         enhancementPrompt,
-        "gemini"
+        "gemini",
       );
 
       let enhancedDescription = baseContent; // fallback to original

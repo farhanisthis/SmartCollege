@@ -1,49 +1,39 @@
 
-// Uses native fetch and FormData (Node 18+)
+import fetch from "node-fetch";
+import FormData from "form-data";
 
-async function reproduce() {
+async function reproduceIssue() {
+  console.log("Starting reproduction script...");
+  
+  // We need to simulate a CR login first to get a session cookie, 
+  // but since we can't easily do that without a real user, 
+  // we might need to rely on the server logs from the user's manual attempt 
+  // OR temporarily bypass auth (which is risky/complex).
+  
+  // ALTERNATIVE: Use the updated test_ai_update.ts BUT import the EXACT same way the route does
+  // to ensure environment loading is identical.
+  
+  // Let's try to hit the route. If we get 403/401, we know at least the server is reachable.
+  // But to test the AI part, we really need to bypass auth or have a valid credential.
+  
+  // Since I added the key to .env, the restart of the server (which happens automatically with nodemon/tsx watch)
+  // SHOULD have picked it up.
+  
+  // Let's try running the logic from routes.ts DIRECTLY in this script, 
+  // but importing from the actual files to see if *that* context works.
+  
   try {
-    const loginResponse = await fetch('http://localhost:10000/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: '055', password: '055' })
-    });
-
-    const cookie = loginResponse.headers.get('set-cookie');
-    console.log('Login Status:', loginResponse.status);
-    console.log('Cookie:', cookie);
-
-    if (!cookie) {
-        console.error("Login failed or no cookie returned");
-        return;
-    }
-
-    const form = new FormData();
-    form.append('content', 'Test update content from script');
-    form.append('category', 'general');
-    form.append('priority', 'normal');
-    form.append('isUrgent', 'false');
-
-    console.log('Sending request to http://localhost:10000/api/updates...');
-    // @ts-ignore
-    const response = await fetch('http://localhost:10000/api/updates', {
-      method: 'POST',
-      body: form,
-      headers: {
-        'Cookie': cookie,
-        // Native fetch with FormData automatically sets Content-Type with boundary
-      }
-    });
-
-    console.log('Status:', response.status);
-    const text = await response.text();
-    console.log('Body:', text);
-
+    const { processInput } = await import("./services/inputPipeline");
+    
+    console.log("Testing processInput directly with new configuration...");
+    const input = "Assignment due next Friday for Data Structures";
+    const result = await processInput(input, "text");
+    
+    console.log("Result:", JSON.stringify(result, null, 2));
+    
   } catch (error) {
-    console.error('Error:', error);
+    console.error("Reproduction failed:", error);
   }
 }
 
-reproduce();
-
-reproduce();
+reproduceIssue();

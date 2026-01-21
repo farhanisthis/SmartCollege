@@ -37,6 +37,7 @@ export interface IUserDocument extends Omit<Document, "_id"> {
     timezone?: string;
   };
   rollNumber?: string;
+  passwordChangedAt?: Date;
 }
 
 const UserSchema = new Schema<IUserDocument>({
@@ -79,6 +80,7 @@ const UserSchema = new Schema<IUserDocument>({
     timezone: { type: String, default: "UTC" },
   },
   rollNumber: { type: String },
+  passwordChangedAt: { type: Date },
 });
 
 // Update Model

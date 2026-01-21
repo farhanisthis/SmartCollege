@@ -674,24 +674,6 @@ export default function Dashboard() {
         </main>
       </div>
 
-      {/* Bottom Action Bar */}
-      <div className="hidden md:flex fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-lg z-50 items-center gap-3">
-        <div className="flex-1 bg-white border border-border shadow-2xl rounded-3xl h-16 flex items-center px-6 gap-3 group focus-within:ring-2 focus-within:ring-[#f54c4c]/50 transition-all">
-          <Search className="h-5 w-5 text-muted-foreground/60" />
-          <input 
-            type="text" 
-            placeholder="Search" 
-            className="flex-1 outline-none font-black text-foreground placeholder:text-muted-foreground/40 bg-transparent"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-        <Button className="hidden md:flex bg-[#f54c4c] hover:bg-[#d43f3f] text-white font-black h-16 px-8 rounded-3xl shadow-2xl items-center gap-2 active:scale-95 transition-all">
-          <Megaphone className="h-5 w-5 fill-current" />
-          Manage Alerts
-        </Button>
-      </div>
-
       {/* Mobile Bottom Navigation - removed for this high-fidelity view or moved */}
       {/* {isMobile && (
         <MobileBottomNav

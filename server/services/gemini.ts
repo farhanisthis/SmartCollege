@@ -1,15 +1,19 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// Initialize Gemini
-// Log key status (don't log the full key)
-const apiKey = process.env.GEMINI_API_KEY || "";
-console.log(`[Gemini] Initializing with key length: ${apiKey.length}`);
+// Initialize Gemini with first available key
+// This file is deprecated - use aiManager.ts for production
+const apiKey =
+  process.env.GEMINI_KEY_1 ||
+  process.env.GEMINI_KEY_2 ||
+  process.env.GEMINI_KEY_3 ||
+  "";
+console.log(`[Gemini Legacy] Initializing with key length: ${apiKey.length}`);
 const genAI = new GoogleGenerativeAI(apiKey);
-const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 export async function generatePerformanceInsight(studentData: any) {
   try {
-    if (!apiKey) throw new Error("GEMINI_API_KEY is missing in server .env");
+    if (!apiKey) throw new Error("GEMINI_KEY_1/2/3 is missing in server .env");
 
     const prompt = `
       Analyze the following student performance data and provide a concise, motivational, and actionable insight (max 2-3 sentences).

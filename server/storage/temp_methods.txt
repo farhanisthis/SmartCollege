@@ -1,0 +1,56 @@
+  async updateUsername(userId: string, newUsername: string): Promise<User | undefined> {
+    try {
+      await this.ensureConnected();
+      
+      // Check if username already exists
+      const existingUser = await UserModel.findOne({ username: newUsername }).lean();
+      if (existingUser && existingUser._id !== userId) {
+        throw new Error("Username already taken");
+      }
+
+      const updatedUser = await UserModel.findByIdAndUpdate(
+        userId,
+        { username: newUsername },
+        { new: true }
+      ).lean();
+
+      return updatedUser ? this.mapUserDocument(updatedUser) : undefined;
+    } catch (error) {
+      console.error("Error updating username:", error);
+      throw error;
+    }
+  }
+
+  async updatePassword(userId: string, oldPassword: string, newPassword: string): Promise<boolean> {
+    try {
+      await this.ensureConnected();
+      
+      // Get user with password
+      const user = await UserModel.findById(userId).lean();
+      if (!user) {
+        throw new Error("User not found");
+      }
+
+      // Verify old password
+      const isMatch = await bcrypt.compare(oldPassword, user.password).catch(() => false);
+      
+      // Also check for legacy plain text passwords
+      if (!isMatch && user.password !== oldPassword) {
+        throw new Error("Current password is incorrect");
+      }
+
+      // Hash new password
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+      // Update password and timestamp
+      await UserModel.findByIdAndUpdate(userId, {
+        password: hashedPassword,
+        passwordChangedAt: new Date(),
+      });
+
+      return true;
+    } catch (error) {
+      console.error("Error updating password:", error);
+      throw error;
+    }
+  }

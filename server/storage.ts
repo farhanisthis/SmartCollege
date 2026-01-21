@@ -37,6 +37,8 @@ export interface IStorage {
     presentationsDelivered: number;
     attendancePercentage: number;
   }>;
+  updateUsername(userId: string, newUsername: string): Promise<User | undefined>;
+  updatePassword(userId: string, oldPassword: string, newPassword: string): Promise<boolean>;
 
   // Update methods
   getUpdates(filters?: {

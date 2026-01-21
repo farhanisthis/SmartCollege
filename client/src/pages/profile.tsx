@@ -7,6 +7,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -38,6 +46,7 @@ interface ProfileData {
     year?: string;
     rollNumber?: string;
     createdAt: string;
+    passwordChangedAt?: string;
   };
   stats: {
     assignmentsCompleted: number;
@@ -56,6 +65,7 @@ export default function Profile() {
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [formData, setFormData] = useState({
     name: "",
+    username: "",
     phone: "",
     location: "",
     bio: "",
@@ -63,6 +73,13 @@ export default function Profile() {
     year: "",
     rollNumber: "",
   });
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   // Load profile data on component mount
   useEffect(() => {
@@ -77,6 +94,7 @@ export default function Profile() {
           setProfileData(data);
           setFormData({
             name: data.user.name || "",
+            username: data.user.username || "",
             phone: data.user.phone || "",
             location: data.user.location || "",
             bio: data.user.bio || "",
@@ -109,13 +127,27 @@ export default function Profile() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
+      // Handle username change if it changed
+      if (formData.username !== profileData?.user.username) {
+        await handleUsernameChange();
+      }
+
+      // Update other profile fields
       const response = await fetch("/api/profile", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
         credentials: "include",
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          name: formData.name,
+          phone: formData.phone,
+          location: formData.location,
+          bio: formData.bio,
+          department: formData.department,
+          year: formData.year,
+          rollNumber: formData.rollNumber,
+        }),
       });
 
       if (response.ok) {
@@ -144,6 +176,113 @@ export default function Profile() {
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleUsernameChange = async () => {
+    if (formData.username === profileData?.user.username) {
+      return; // No change
+    }
+
+    try {
+      const response = await fetch("/api/profile/username", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ newUsername: formData.username }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (profileData) {
+          setProfileData({
+            ...profileData,
+            user: { ...profileData.user, username: data.user.username },
+          });
+        }
+        toast({
+          title: "Username Updated",
+          description: "Your username has been successfully updated.",
+        });
+      } else {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to update username");
+      }
+    } catch (error: any) {
+      console.error("Error updating username:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update username. Please try again.",
+        variant: "destructive",
+      });
+      // Revert username in form
+      if (profileData) {
+        setFormData(prev => ({ ...prev, username: profileData.user.username }));
+      }
+    }
+  };
+
+  const handlePasswordChange = async () => {
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast({
+        title: "Error",
+        description: "New passwords do not match",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (passwordData.newPassword.length < 8) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 8 characters",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const response = await fetch("/api/profile/password", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          currentPassword: passwordData.currentPassword,
+          newPassword: passwordData.newPassword,
+        }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Password Updated",
+          description: "Your password has been successfully updated.",
+        });
+        setIsPasswordDialogOpen(false);
+        setPasswordData({
+          currentPassword: "",
+          newPassword: "",
+          confirmPassword: "",
+        });
+        // Reload profile to get updated passwordChangedAt
+        window.location.reload();
+      } else {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to update password");
+      }
+    } catch (error: any) {
+      console.error("Error updating password:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update password. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
@@ -380,9 +519,12 @@ export default function Profile() {
                       <Label htmlFor="username" className="text-[11px] font-black uppercase tracking-widest text-muted-foreground ml-2 mb-2 block">Username</Label>
                       <Input
                         id="username"
-                        value={profileData.user.username}
-                        disabled
-                        className="h-12 rounded-2xl px-6 font-bold bg-[#f1f3f5] border-transparent text-muted-foreground opacity-60"
+                        value={formData.username}
+                        onChange={(e) =>
+                          handleInputChange("username", e.target.value)
+                        }
+                        disabled={!isEditing}
+                        className="h-12 rounded-2xl px-6 font-bold bg-[#f8f9fa] border-transparent focus:bg-white focus:border-[#f54c4c]/20 transition-all"
                       />
                     </div>
                   </div>
@@ -465,10 +607,12 @@ export default function Profile() {
                     <div>
                       <h4 className="font-medium">Password</h4>
                       <p className="text-sm text-muted-foreground">
-                        Last changed 2 months ago
+                        {profileData.user.passwordChangedAt
+                          ? `Last changed ${new Date(profileData.user.passwordChangedAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`
+                          : "Never changed"}
                       </p>
                     </div>
-                    <Button variant="outline">Change Password</Button>
+                    <Button variant="outline" onClick={() => setIsPasswordDialogOpen(true)}>Change Password</Button>
                   </div>
                   <Separator />
                   <div className="flex justify-between items-center">
@@ -486,6 +630,86 @@ export default function Profile() {
           </div>
         </div>
       </div>
+
+      {/* Password Change Dialog */}
+      <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Change Password</DialogTitle>
+            <DialogDescription>
+              Enter your current password and choose a new password (minimum 8 characters).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="currentPassword">Current Password</Label>
+              <Input
+                id="currentPassword"
+                type="password"
+                value={passwordData.currentPassword}
+                onChange={(e) =>
+                  setPasswordData((prev) => ({ ...prev, currentPassword: e.target.value }))
+                }
+                placeholder="Enter current password"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="newPassword">New Password</Label>
+              <Input
+                id="newPassword"
+                type="password"
+                value={passwordData.newPassword}
+                onChange={(e) =>
+                  setPasswordData((prev) => ({ ...prev, newPassword: e.target.value }))
+                }
+                placeholder="Enter new password (min 8 characters)"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="confirmPassword">Confirm New Password</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                value={passwordData.confirmPassword}
+                onChange={(e) =>
+                  setPasswordData((prev) => ({ ...prev, confirmPassword: e.target.value }))
+                }
+                placeholder="Confirm new password"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsPasswordDialogOpen(false);
+                setPasswordData({
+                  currentPassword: "",
+                  newPassword: "",
+                  confirmPassword: "",
+                });
+              }}
+              disabled={isChangingPassword}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handlePasswordChange}
+              disabled={isChangingPassword}
+              className="bg-[#f54c4c] hover:bg-[#d43f3f] text-white"
+            >
+              {isChangingPassword ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Changing...
+                </>
+              ) : (
+                "Change Password"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

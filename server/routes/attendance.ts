@@ -308,17 +308,25 @@ router.post(
       // Relaxed validation to allow for dynamic subjects (Sixth Semester)
       /*
       const validSubjects = [
-        "Computer Graphics",
-        "CG",
-        "CG Lab 4",
-        "Operating Systems",
-        "OS",
-        "Cloud Computing",
-        "CC",
-        "Machine Learning",
-        "ML",
-        "ML Lab 4",
-        "Linux Lab 4",
+        "Data Warehousing & Data Mining",
+        "DWDM",
+        "e-Commerce",
+        "e-com",
+        "Internet of Things",
+        "IOT",
+        "IOT Lab1",
+        "Data Visualization & Analytics",
+        "DVA",
+        "DVA 311",
+        "DVA Lab 4",
+        "Deep Learning with Python",
+        "DL",
+        "DL 312",
+        "DL Lab 5",
+        "Major Project",
+        "MP",
+        "MP 212",
+        "MP Lab1",
       ];
       */
 
@@ -971,17 +979,25 @@ router.post(
 
       // Use the existing save logic (similar to save-day endpoint)
       const validSubjects = [
-        "Computer Graphics",
-        "CG",
-        "CG Lab 4",
-        "Operating Systems",
-        "OS",
-        "Cloud Computing",
-        "CC",
-        "Machine Learning",
-        "ML",
-        "ML Lab 4",
-        "Linux Lab 4",
+        "Data Warehousing & Data Mining",
+        "DWDM",
+        "e-Commerce",
+        "e-com",
+        "Internet of Things",
+        "IOT",
+        "IOT Lab1",
+        "Data Visualization & Analytics",
+        "DVA",
+        "DVA 311",
+        "DVA Lab 4",
+        "Deep Learning with Python",
+        "DL",
+        "DL 312",
+        "DL Lab 5",
+        "Major Project",
+        "MP",
+        "MP 212",
+        "MP Lab1",
       ];
 
       const validateStatus = (status: string | unknown): "present" | "absent" => {
@@ -1002,24 +1018,38 @@ router.post(
       // Convert full subject names to frontend-expected short names
       const convertToFrontendSubjectName = (dbSubjectName: string): string => {
         switch (dbSubjectName.toLowerCase()) {
-          case "cloud computing":
-          case "cc":
-            return "CC";
-          case "computer graphics":
-          case "cg":
-            return "CG";
-          case "cg lab 4":
-            return "CG Lab 4";
-          case "machine learning":
-          case "ml":
-            return "ML";
-          case "ml lab 4":
-            return "ML Lab 4";
-          case "linux lab 4":
-            return "Linux Lab 4";
-          case "operating systems":
-          case "os":
-            return "OS";
+          case "data warehousing & data mining":
+          case "dwdm":
+            return "DWDM";
+          case "e-commerce":
+          case "e-com":
+            return "e-Commerce";
+          case "internet of things":
+          case "iot":
+            return "IOT";
+          case "iot lab1":
+            return "IOT Lab1";
+          case "data visualization & analytics":
+          case "dva":
+            return "DVA";
+          case "dva 311":
+            return "DVA 311";
+          case "dva lab 4":
+            return "DVA Lab 4";
+          case "deep learning with python":
+          case "dl":
+            return "DL";
+          case "dl 312":
+            return "DL 312";
+          case "dl lab 5":
+            return "DL Lab 5";
+          case "major project":
+          case "mp":
+            return "MP";
+          case "mp 212":
+            return "MP 212";
+          case "mp lab1":
+            return "MP Lab1";
           default:
             return dbSubjectName; // Return as-is if no mapping found
         }
@@ -1274,17 +1304,25 @@ router.post(
 
       // Use the existing save logic (similar to save-day endpoint)
       const validSubjects = [
-        "Computer Graphics",
-        "CG",
-        "CG Lab 4",
-        "Operating Systems",
-        "OS",
-        "Cloud Computing",
-        "CC",
-        "Machine Learning",
-        "ML",
-        "ML Lab 4",
-        "Linux Lab 4",
+        "Data Warehousing & Data Mining",
+        "DWDM",
+        "e-Commerce",
+        "e-com",
+        "Internet of Things",
+        "IOT",
+        "IOT Lab1",
+        "Data Visualization & Analytics",
+        "DVA",
+        "DVA 311",
+        "DVA Lab 4",
+        "Deep Learning with Python",
+        "DL",
+        "DL 312",
+        "DL Lab 5",
+        "Major Project",
+        "MP",
+        "MP 212",
+        "MP Lab1",
       ];
 
       const validateStatus = (status: string | unknown): "present" | "absent" => {
@@ -1305,24 +1343,38 @@ router.post(
       // Convert full subject names to frontend-expected short names
       const convertToFrontendSubjectName = (dbSubjectName: string): string => {
         switch (dbSubjectName.toLowerCase()) {
-          case "cloud computing":
-          case "cc":
-            return "CC";
-          case "computer graphics":
-          case "cg":
-            return "CG";
-          case "cg lab 4":
-            return "CG Lab 4";
-          case "machine learning":
-          case "ml":
-            return "ML";
-          case "ml lab 4":
-            return "ML Lab 4";
-          case "linux lab 4":
-            return "Linux Lab 4";
-          case "operating systems":
-          case "os":
-            return "OS";
+          case "data warehousing & data mining":
+          case "dwdm":
+            return "DWDM";
+          case "e-commerce":
+          case "e-com":
+            return "e-Commerce";
+          case "internet of things":
+          case "iot":
+            return "IOT";
+          case "iot lab1":
+            return "IOT Lab1";
+          case "data visualization & analytics":
+          case "dva":
+            return "DVA";
+          case "dva 311":
+            return "DVA 311";
+          case "dva lab 4":
+            return "DVA Lab 4";
+          case "deep learning with python":
+          case "dl":
+            return "DL";
+          case "dl 312":
+            return "DL 312";
+          case "dl lab 5":
+            return "DL Lab 5";
+          case "major project":
+          case "mp":
+            return "MP";
+          case "mp 212":
+            return "MP 212";
+          case "mp lab1":
+            return "MP Lab1";
           default:
             return dbSubjectName; // Return as-is if no mapping found
         }
