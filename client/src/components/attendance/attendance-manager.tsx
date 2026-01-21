@@ -133,6 +133,7 @@ interface Student {
   name: string;
   email: string;
   enrollment: string;
+  profilePicture?: string;
 }
 
 // Extract subjects for a specific day
@@ -169,7 +170,7 @@ interface AttendanceStatus {
 export default function AttendanceManager() {
   const [date, setDate] = useState<Date>(new Date());
   const [students, setStudents] = useState<Student[]>([]);
-  const [attendance, setAttendance] = useState<Record<string, Record<string, string>>>({});
+  const [attendance, setAttendance] = useState<AttendanceStatus>({});
   const [searchQuery, setSearchQuery] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -329,7 +330,8 @@ export default function AttendanceManager() {
                id: s._id,
                name: s.name,
                email: s.email,
-               enrollment: s.enrollment || s.username // fallback if enrollment missing
+               enrollment: s.enrollment || s.username, // fallback if enrollment missing
+               profilePicture: s.profilePicture,
             }));
             setStudents(mappedStudents);
           }
@@ -400,7 +402,7 @@ export default function AttendanceManager() {
                   studentRecord.subjects.forEach((subjectRecord: any) => {
                     loadedAttendance[targetId][
                       subjectRecord.subjectName
-                    ] = subjectRecord.status;
+                    ] = subjectRecord.status as "present" | "absent" | undefined;
                   });
                 }
                });
@@ -697,7 +699,7 @@ export default function AttendanceManager() {
       
       // Add columns for each subject
       subjectsForDay.forEach(sub => {
-        row[sub.subject] = studentAttendance[sub.subject] || "Unmarked";
+        row[sub.subject] = (studentAttendance[sub.subject] as string) || "Unmarked";
       });
       
       return row;
@@ -751,6 +753,7 @@ export default function AttendanceManager() {
                       status={status}
                       onMarkPresent={() => handleMobileMarkPresent(student.id)}
                       onMarkAbsent={() => handleMobileMarkAbsent(student.id)}
+                      profilePicture={student.profilePicture}
                     />
                   );
                 })}

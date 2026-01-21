@@ -107,6 +107,18 @@
       font-size: 17px;
     }
   }
+
+  /* Global scrollbar hiding */
+  ::-webkit-scrollbar {
+    display: none;
+    width: 0px;
+    background: transparent;
+  }
+  
+  * {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
 }
 
 /* Utility class for safe area padding */

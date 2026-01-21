@@ -118,21 +118,19 @@ export default function StudentAttendanceTracker() {
     > = {};
 
     // Get current user ID from auth context
-    // Get current user ID from auth context
-    // IMPORTANT: Use enrollment number to match with attendance records
-    // Database stores attendance with enrollment numbers like "00124402023"
-    // @ts-ignore - enrollment might not be in the strict User type yet
-    const currentUserId = user?.enrollment || user?.rollNumber || user?.id;
+    // @ts-ignore
+    const currentUserId = user?.id;
+    // @ts-ignore
+    const enrollment = user?.enrollment || user?.username; // Fallback to username for E1
 
     console.log("[Attendance Tracker] User info:", {
-      userId: user?.id,
-      rollNumber: user?.rollNumber,
-      usingId: currentUserId,
+      userId: currentUserId,
+      enrollment: enrollment,
       name: user?.name,
     });
 
-    if (!currentUserId) {
-      console.error("No user ID or rollNumber available");
+    if (!currentUserId && !enrollment) {
+      console.error("No user ID or enrollment available");
       return {
         attendanceHistory: [],
         statistics: {
@@ -156,23 +154,13 @@ export default function StudentAttendanceTracker() {
     }
 
     for (const record of rawData) {
-      console.log("[Attendance Tracker] Processing record:", {
-        date: record.date,
-        totalStudents: record.students?.length,
-        sampleStudentIds: record.students
-          ?.slice(0, 3)
-          .map((s: any) => s.studentId),
-      });
-
+      // Find student record matching either ID or Enrollment
       const studentRecord = record.students?.find(
-        (s: any) => s.studentId === currentUserId
+        (s: any) => 
+          s.studentId === currentUserId || 
+          s.studentId === enrollment ||
+          (s.enrollment && s.enrollment === enrollment)
       );
-
-      console.log("[Attendance Tracker] Match result:", {
-        lookingFor: currentUserId,
-        found: !!studentRecord,
-        subjectCount: studentRecord?.subjects?.length,
-      });
 
       if (studentRecord) {
         for (const subjectRecord of studentRecord.subjects) {

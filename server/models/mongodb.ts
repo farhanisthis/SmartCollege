@@ -37,6 +37,7 @@ export interface IUserDocument extends Omit<Document, "_id"> {
     timezone?: string;
   };
   rollNumber?: string;
+  profilePicture?: string;
   passwordChangedAt?: Date;
 }
 
@@ -81,6 +82,7 @@ const UserSchema = new Schema<IUserDocument>({
   },
   rollNumber: { type: String },
   passwordChangedAt: { type: Date },
+  profilePicture: { type: String },
 });
 
 // Update Model

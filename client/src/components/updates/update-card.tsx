@@ -568,36 +568,36 @@ export default function UpdateCard({ update, onRefresh }: UpdateCardProps) {
     <>
       <Card
         id={`update-card-${update.id}`}
-        className="p-4 mb-4 hover:shadow-lg transition-all border border-border/50 shadow-card rounded-3xl group cursor-pointer"
+        className="p-3 mb-2 hover:shadow-lg transition-all border border-border/50 shadow-sm rounded-2xl group cursor-pointer"
         data-testid={`update-card-${update.id}`}
         onClick={handleCardClick}
       >
         <div className="flex items-center gap-4">
           {/* Left Icon Box */}
-          <div className={`w-14 h-14 ${config.color} rounded-2xl flex items-center justify-center flex-shrink-0`}>
-            <Icon className="h-6 w-6" style={{ color: config.iconColor }} />
+          <div className={`w-10 h-10 ${config.color} rounded-xl flex items-center justify-center flex-shrink-0`}>
+            <Icon className="h-4 w-4" style={{ color: config.iconColor }} />
           </div>
 
           {/* Content Middle */}
           <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <Badge variant={config.badgeVariant} className="text-[10px] px-2 py-0.5">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <Badge variant={config.badgeVariant} className="text-[9px] px-1.5 py-0 h-4">
                   {config.label}
                 </Badge>
                 {deadlineInfo && (
-                  <Badge variant="outline" className={cn("text-[10px] px-2 py-0.5 border-none", deadlineInfo.colorClass)}>
+                  <Badge variant="outline" className={cn("text-[9px] px-1.5 py-0 h-4 border-none", deadlineInfo.colorClass)}>
                     {deadlineInfo.text}
                   </Badge>
                 )}
-                <span className="text-[11px] text-muted-foreground font-bold ml-auto">
+                <span className="text-[9px] text-muted-foreground font-bold ml-auto">
                   {update.createdAt ? format(new Date(update.createdAt), "MMM d") : ""}
                 </span>
               </div>
-            <h3 className="text-[15px] font-black text-foreground truncate leading-snug">
+            <h3 className="text-[13px] font-black text-foreground truncate leading-snug">
               {update.title}
             </h3>
             {update.content && (
-              <p className="text-[13px] text-muted-foreground font-medium mt-1 line-clamp-3 whitespace-pre-line leading-relaxed">
+              <p className="text-[11px] text-muted-foreground font-medium mt-0.5 line-clamp-2 whitespace-pre-line leading-relaxed">
                   {update.description || update.content}
               </p>
             )}
@@ -613,20 +613,20 @@ export default function UpdateCard({ update, onRefresh }: UpdateCardProps) {
               
               {/* Action buttons - always visible for better UX */}
               <div className="flex items-center">
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={handleShare}>
-                      <Share className="h-4 w-4" />
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={handleShare}>
+                      <Share className="h-3.5 w-3.5" />
                   </Button>
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50" 
+                    className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-50" 
                     onClick={(e) => {
                       e.stopPropagation();
                       handleDelete();
                     }}
                     disabled={isDeleting}
                   >
-                      {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                      {isDeleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                   </Button>
               </div>
           </div>

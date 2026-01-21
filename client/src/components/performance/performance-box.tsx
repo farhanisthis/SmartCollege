@@ -121,18 +121,18 @@ const PerformanceBox: React.FC<PerformanceBoxProps> = ({
       onClick={onClick}
     >
       <CardHeader className={`flex flex-row items-center justify-between space-y-0 ${compact ? 'pb-1 p-3' : 'pb-2'}`}>
-        <CardTitle className={`${compact ? 'text-xs' : 'text-sm'} font-medium text-gray-600 truncate mr-2`}>
+        <CardTitle className={`${compact ? 'text-[11px]' : 'text-sm'} font-medium text-gray-600 truncate mr-1`}>
           {title}
         </CardTitle>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-1.5">
           {getIconForType(type)}
           {onClick && (
-            <span className="text-xs text-gray-400">Click for details</span>
+            <span className="text-[10px] text-gray-400">View</span>
           )}
         </div>
       </CardHeader>
       <CardContent className={compact ? 'p-3 pt-0' : ''}>
-        <div className="flex items-center justify-between">
+        <div className={`flex items-center ${compact ? 'justify-center' : 'justify-between'}`}>
           <div className="flex items-baseline space-x-2">
             <span
               className={`${compact ? 'text-2xl' : 'text-3xl'} font-bold ${getStatusColor(
@@ -144,7 +144,7 @@ const PerformanceBox: React.FC<PerformanceBoxProps> = ({
             </span>
           </div>
 
-          {getSecondaryInfo() !== null && (
+          {!compact && getSecondaryInfo() !== null && (
             <Badge
               variant={
                 typeof getSecondaryInfo() === "number" &&
@@ -160,7 +160,7 @@ const PerformanceBox: React.FC<PerformanceBoxProps> = ({
         </div>
 
         {isLowPerformance && (
-          <div className="mt-2 text-xs text-red-600">Needs improvement</div>
+          <div className={`mt-2 text-xs text-red-600 ${compact ? 'text-center' : ''}`}>Needs improvement</div>
         )}
       </CardContent>
     </Card>

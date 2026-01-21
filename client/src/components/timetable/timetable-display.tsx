@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Loader2 } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 // Safelist for Tailwind JIT to pick up dynamic database colors
 export const _colorSafelist = [
@@ -195,6 +196,15 @@ export default function TimetableDisplay() {
 
   const timeSlots = sortTimeSlots(Object.keys(timetableSchedule));
 
+  const isMobile = useIsMobile();
+  
+  // Format time short for mobile
+  const formatTimeForMobile = (timeSlot: string) => {
+    if (!isMobile) return timeSlot;
+    // Extract times "10:30 AM\n—\n11:30 AM" -> "10:30\n11:30"
+    return timeSlot.replace(/ AM| PM/g, "").replace(/\n—\n/g, "\n");
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -205,20 +215,20 @@ export default function TimetableDisplay() {
   }
 
   return (
-    <div className="space-y-6">
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle className="text-2xl font-bold text-center">
-            Class Schedule E1 - Computer Science Semester 5
+    <div className="space-y-4 md:space-y-6">
+      <Card className="w-full shadow-none border-0 md:border md:shadow-sm">
+        <CardHeader className="px-2 py-4 md:p-6">
+          <CardTitle className="text-lg md:text-2xl font-bold text-center leading-tight">
+            Class Schedule E1
+            <span className="block text-sm md:text-lg font-normal text-muted-foreground mt-1">
+                Computer Science Semester 5
+            </span>
           </CardTitle>
-          <p className="text-center text-gray-600">
-            Weekly Timetable for Section E1
-          </p>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-6 gap-2 rounded-xl overflow-hidden">
+        <CardContent className="px-0 md:p-6">
+          <div className="grid grid-cols-6 gap-1 md:gap-2 rounded-xl overflow-hidden">
             {/* Header - Time slot */}
-            <div className="p-3 font-bold text-white bg-gray-800 rounded-lg text-lg shadow-inner flex items-center justify-center h-20">
+            <div className="p-1 md:p-3 font-bold text-white bg-gray-800 rounded-[15px] md:rounded-lg text-[10px] md:text-lg shadow-inner flex items-center justify-center h-12 md:h-20">
               Time
             </div>
 
@@ -226,9 +236,9 @@ export default function TimetableDisplay() {
             {days.map((day) => (
               <div
                 key={day}
-                className="p-3 font-bold text-white text-center bg-gray-800 rounded-lg text-lg shadow-inner flex items-center justify-center h-20"
+                className="p-1 md:p-3 font-bold text-white text-center bg-gray-800 rounded-[15px] md:rounded-lg text-[10px] md:text-lg shadow-inner flex items-center justify-center h-12 md:h-20"
               >
-                {day}
+                {isMobile ? day.substring(0, 3) : day}
               </div>
             ))}
 
@@ -236,8 +246,8 @@ export default function TimetableDisplay() {
             {timeSlots.map((timeSlot) => (
               <React.Fragment key={timeSlot}>
                 {/* Time slot */}
-                <div className="p-3 font-semibold text-white bg-gray-800 rounded-lg text-sm shadow-inner flex flex-col items-center justify-center h-20 whitespace-pre-line">
-                  {timeSlot}
+                <div className="p-1 md:p-3 font-semibold text-white bg-gray-800 rounded-[15px] md:rounded-lg text-[9px] md:text-sm shadow-inner flex flex-col items-center justify-center h-12 md:h-20 whitespace-pre-line leading-tight text-center">
+                  {formatTimeForMobile(timeSlot)}
                 </div>
 
                 {/* Schedule cells */}
@@ -249,15 +259,17 @@ export default function TimetableDisplay() {
                   return (
                     <div
                       key={`${timeSlot}-${day}`}
-                      className={`p-2 flex flex-col items-center justify-center rounded-lg shadow-lg transition-all bg-gradient-to-br ${cellBg} h-20 overflow-hidden hover:scale-105 cursor-pointer`}
+                      className={`p-0.5 md:p-2 flex flex-col items-center justify-center rounded-[15px] md:rounded-lg shadow-sm md:shadow-lg transition-all bg-gradient-to-br ${cellBg} h-12 md:h-20 overflow-hidden active:scale-95 md:hover:scale-105 cursor-pointer`}
                       title={
                         cellText
                           ? `${cellText} - ${timeSlot.replace("\n", " ")}`
                           : "Free Period"
                       }
                     >
-                      <span className="text-lg font-bold text-white text-center drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
-                        {cellText}
+                      <span className="text-[10px] md:text-lg font-bold text-white text-center drop-shadow-md leading-none whitespace-pre-line">
+                        {isMobile ? 
+                          (cellText.includes('Lab') ? cellText.replace(' ', '\n') : (cellText.length > 5 ? cellText.substring(0, 4) + '.' : cellText))
+                          : cellText}
                       </span>
                     </div>
                   );
@@ -268,16 +280,16 @@ export default function TimetableDisplay() {
 
           {/* Subject Legend */}
           {subjects.length > 0 && (
-            <div className="mt-6 space-y-4">
-              <h3 className="text-lg font-semibold text-gray-800">
+            <div className="mt-6 space-y-3 px-2">
+              <h3 className="text-sm md:text-lg font-semibold text-gray-800">
                 Subject Legend
               </h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 gap-2 md:gap-4">
                 {subjects.map((subject) => (
-                  <div key={subject.code} className="flex items-center gap-3">
-                    <div className={`w-6 h-6 rounded bg-gradient-to-br ${subject.color}`}></div>
-                    <span className="text-sm font-medium">
-                      {subject.code} - {subject.name}
+                  <div key={subject.code} className="flex items-center gap-2 md:gap-3 bg-slate-50 p-2 rounded-lg border border-slate-100">
+                    <div className={`w-3 h-3 md:w-6 md:h-6 rounded-full md:rounded bg-gradient-to-br ${subject.color} shrink-0`}></div>
+                    <span className="text-[10px] md:text-sm font-medium leading-tight line-clamp-2">
+                      <span className="font-bold">{subject.code}</span> - {subject.name}
                     </span>
                   </div>
                 ))}
@@ -286,32 +298,32 @@ export default function TimetableDisplay() {
           )}
 
           {/* Weekly Summary */}
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">
+          <div className="mt-6 p-3 md:p-4 bg-gray-50 rounded-xl mx-2 md:mx-0">
+            <h3 className="text-sm md:text-lg font-semibold text-gray-800 mb-3">
               Weekly Summary
             </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <div className="bg-white p-3 rounded shadow-sm">
-                <div className="font-semibold text-gray-700">Total Classes</div>
-                <div className="text-2xl font-bold text-blue-600">{timeSlots.length * days.length}</div>
-                <div className="text-xs text-gray-500">per week</div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+              <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-100">
+                <div className="font-semibold text-gray-700 text-xs md:text-base">Total Classes</div>
+                <div className="text-xl md:text-2xl font-bold text-blue-600">{timeSlots.length * days.length}</div>
+                <div className="text-[10px] md:text-xs text-gray-500">per week</div>
               </div>
-              <div className="bg-white p-3 rounded shadow-sm">
-                <div className="font-semibold text-gray-700">Subjects</div>
-                <div className="text-2xl font-bold text-green-600">{subjects.length}</div>
-                <div className="text-xs text-gray-500">different subjects</div>
+              <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-100">
+                <div className="font-semibold text-gray-700 text-xs md:text-base">Subjects</div>
+                <div className="text-xl md:text-2xl font-bold text-green-600">{subjects.length}</div>
+                <div className="text-[10px] md:text-xs text-gray-500">different subjects</div>
               </div>
-              <div className="bg-white p-3 rounded shadow-sm">
-                <div className="font-semibold text-gray-700">Lab Sessions</div>
-                <div className="text-2xl font-bold text-purple-600">
+              <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-100">
+                <div className="font-semibold text-gray-700 text-xs md:text-base">Lab Sessions</div>
+                <div className="text-xl md:text-2xl font-bold text-purple-600">
                   {subjects.filter(s => s.code.includes('Lab')).length * 5}
                 </div>
-                <div className="text-xs text-gray-500">per week</div>
+                <div className="text-[10px] md:text-xs text-gray-500">per week</div>
               </div>
-              <div className="bg-white p-3 rounded shadow-sm">
-                <div className="font-semibold text-gray-700">Class Hours</div>
-                <div className="text-2xl font-bold text-orange-600">{timeSlots.length * days.length}</div>
-                <div className="text-xs text-gray-500">per week</div>
+              <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-100">
+                <div className="font-semibold text-gray-700 text-xs md:text-base">Class Hours</div>
+                <div className="text-xl md:text-2xl font-bold text-orange-600">{timeSlots.length * days.length}</div>
+                <div className="text-[10px] md:text-xs text-gray-500">per week</div>
               </div>
             </div>
           </div>

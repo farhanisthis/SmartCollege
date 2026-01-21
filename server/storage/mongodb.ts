@@ -449,6 +449,7 @@ export class MongoStorage implements IStorage {
       department?: string;
       year?: string;
       rollNumber?: string;
+      profilePicture?: string;
     }
   ): Promise<User | undefined> {
     try {

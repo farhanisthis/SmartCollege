@@ -28,6 +28,7 @@ export const users = pgTable("users", {
   department: text("department"),
   year: text("year"),
   rollNumber: text("roll_number"),
+  profilePicture: text("profile_picture"),
   preferences: jsonb("preferences"),
 });
 

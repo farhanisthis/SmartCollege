@@ -588,7 +588,7 @@ router.get("/e1-students", requireAuth, async (req: any, res: any) => {
     }
 
     const students = await UserModel.find(query)
-      .select("_id username name email enrollment createdAt class")
+      .select("_id username name email enrollment createdAt class profilePicture")
       .sort({ enrollment: 1, name: 1 });
 
     console.log(

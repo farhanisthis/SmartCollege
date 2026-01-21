@@ -245,6 +245,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/profile/picture", requireAuth, upload.single("picture"), handleUploadError, async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No image uploaded" });
+      }
+
+      const userId = req.session.userId!;
+      // Construct file URL - assuming uploads are served from /uploads
+      // req.file.filename is the saved filename in uploads/ dir
+      const profilePictureUrl = `/uploads/${req.file.filename}`;
+
+      const updatedUser = await storage.updateProfile(userId, {
+        profilePicture: profilePictureUrl,
+      });
+
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json({
+        message: "Profile picture updated successfully",
+        profilePicture: profilePictureUrl,
+        user: {
+          id: updatedUser.id,
+          username: updatedUser.username,
+          name: updatedUser.name,
+          role: updatedUser.role,
+          class: updatedUser.class,
+          profilePicture: updatedUser.profilePicture
+        }
+      });
+    } catch (error) {
+      console.error("Upload profile picture error:", error);
+      res.status(500).json({ message: "Failed to upload profile picture" });
+    }
+  });
+
   app.put("/api/profile", requireAuth, async (req, res) => {
     try {
       const { name, phone, location, bio, department, year, rollNumber } =

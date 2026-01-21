@@ -10,6 +10,7 @@ interface MobileStudentRowProps {
   status: "present" | "absent" | undefined;
   onMarkPresent: () => void;
   onMarkAbsent: () => void;
+  profilePicture?: string;
 }
 
 export function MobileStudentRow({
@@ -18,12 +19,13 @@ export function MobileStudentRow({
   status,
   onMarkPresent,
   onMarkAbsent,
+  profilePicture,
 }: MobileStudentRowProps) {
   return (
     <div className="flex items-center justify-between p-2 bg-white border-b border-gray-100 last:border-0">
       <div className="flex items-center gap-2.5">
         <Avatar className="h-8 w-8 bg-gray-50 border border-gray-100">
-          <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${enrollment}`} />
+          <AvatarImage src={profilePicture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${enrollment}`} className="object-cover" />
           <AvatarFallback className="text-gray-400 font-medium text-[10px]">
             {name.charAt(0)}
           </AvatarFallback>

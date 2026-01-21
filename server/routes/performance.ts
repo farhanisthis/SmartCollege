@@ -43,8 +43,8 @@ const requireAuth = async (req: any, res: any, next: any) => {
 };
 
 // Calculate performance metrics for a user
-// @param userId - Should be the student's rollNumber (enrollment number) for attendance matching
-async function calculatePerformanceMetrics(userId: string, section: string, subject?: string) {
+// @param user - The full user object to allow matching by various IDs
+async function calculatePerformanceMetrics(user: any, section: string, subject?: string) {
   // Attendance percentage using AttendanceModel
   let totalAttendanceCount = 0;
   let presentCount = 0;
@@ -59,17 +59,27 @@ async function calculatePerformanceMetrics(userId: string, section: string, subj
       };
   }
 
-  // Count total attendance records for this student (and subject if provided)
-  totalAttendanceCount = await AttendanceModel.countDocuments({
-    studentId: userId,
-    ...(subject ? { subject } : {})
-  });
+  // Construct a robust query that checks all possible identifiers
+  const studentQuery: any = {
+      $or: [
+          { studentId: user.userId }, // Mongo ID
+          { studentId: user.username }, // Username/Enrollment
+          { studentId: user.enrollment }, // Explicit Enrollment
+          { studentId: user.rollNumber } // Roll Number
+      ].filter(c => c.studentId) // Remove undefined keys
+  };
+
+  if (subject) {
+      studentQuery.subject = subject;
+  }
+
+  // Count total attendance records for this student
+  totalAttendanceCount = await AttendanceModel.countDocuments(studentQuery);
 
   // Count present records
   presentCount = await AttendanceModel.countDocuments({
-    studentId: userId,
-    status: "present",
-    ...(subject ? { subject } : {})
+    ...studentQuery,
+    status: "present"
   });
 
   const attendancePercentage =
@@ -82,7 +92,7 @@ async function calculatePerformanceMetrics(userId: string, section: string, subj
     ...(subject && { subject }),
   });
   const submittedAssignments = await AssignmentSubmissionModel.countDocuments({
-    userId, // Checks submission by UUID (correct)
+    userId: user.userId, // Checks submission by UUID (correct)
     updateId: { $in: assignments.map((a) => a._id) },
   });
   const assignmentCompletion =
@@ -96,7 +106,7 @@ async function calculatePerformanceMetrics(userId: string, section: string, subj
     ...(subject && { subject }),
   });
   const completedPresentations = await PresentationModel.countDocuments({
-    userId,
+    userId: user.userId,
     status: "completed",
     updateId: { $in: allPresentations.map((p) => p._id) },
   });
@@ -197,7 +207,7 @@ router.get("/metrics", requireAuth, async (req: any, res: any) => {
     );
 
     const metrics = await calculatePerformanceMetrics(
-      rollNumber, // Use rollNumber instead of userId
+      user, // Use user object
       section || "", // Pass section
       subject
     );
@@ -406,7 +416,7 @@ router.get("/dashboard", requireAuth, async (req: any, res: any) => {
 
     // For attendance, we'll still use the calculatePerformanceMetrics function for now
     const attendanceMetrics = await calculatePerformanceMetrics(
-      rollNumber, // Use rollNumber instead of userId for attendance matching
+      user, // Use user object for attendance matching
       section, // Pass section
       subject
     );

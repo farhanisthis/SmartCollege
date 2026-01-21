@@ -165,13 +165,20 @@ function getSubjectsForDay(dayOfWeek: string): string[] {
 
 // Authentication middleware to populate req.user from session
 const requireAuth = async (req: any, res: Response, next: NextFunction) => {
+  console.log(`[Attendance Auth] Checking auth for ${req.method} ${req.path}`);
+  console.log(`[Attendance Auth] Headers Cookie: ${req.headers.cookie}`);
+  console.log(`[Attendance Auth] Session ID: ${req.sessionID}`);
+  console.log(`[Attendance Auth] Session UserID: ${req.session?.userId}`);
+
   if (!req.session.userId) {
+    console.log(`[Attendance Auth] Failed: No userId in session`);
     return res.status(401).json({ message: "Authentication required" });
   }
 
   try {
     const user = await UserModel.findById(req.session.userId);
     if (!user) {
+        console.log(`[Attendance Auth] Failed: User ${req.session.userId} not found in DB`);
         return res.status(401).json({ message: "User not found" });
     }
 
@@ -182,7 +189,8 @@ const requireAuth = async (req: any, res: Response, next: NextFunction) => {
         username: user.username,
         class: user.class
     };
-
+    
+    console.log(`[Attendance Auth] Success: User ${user.username} (${user.role})`);
     next();
   } catch (err) {
       console.error("Auth middleware error:", err);
@@ -440,7 +448,45 @@ router.get(
           .slice(0, parseInt(limit as string));
 
       const history = await Promise.all(sortedDates.map(async (date) => {
-          const count = await AttendanceModel.distinct("studentId", {
+          // Fetch actual attendance records for this date
+          const recordsQuery: any = {
+               date: date,
+               classSection: section
+          };
+
+          // If user is a student, only fetch their records to be efficient and secure
+          // Logic: If they are NOT CR, they are likely a student.
+          // We can try matching by userId or username/enrollment
+          if (req.user?.role !== 'cr') {
+             // We'll search for records that might match their ID or username (enrollment)
+             recordsQuery.$or = [
+                 { studentId: req.user?.userId },
+                 { studentId: req.user?.username }
+             ];
+             // If we had enrollment field in req.user, we'd use that too.
+          }
+
+          const records = await AttendanceModel.find(recordsQuery).lean();
+
+          // Group by studentId to reconstruct the structure expected by frontend
+          const studentMap = new Map<string, any>();
+          
+          for (const record of records) {
+            if (!studentMap.has(record.studentId)) {
+                studentMap.set(record.studentId, {
+                    studentId: record.studentId,
+                    enrollment: record.studentId, // fallback
+                    subjects: []
+                });
+            }
+            studentMap.get(record.studentId).subjects.push({
+                subjectName: record.subject,
+                status: record.status,
+                timestamp: record.createdAt
+            });
+          }
+
+          const studentCount = await AttendanceModel.distinct("studentId", {
                date: date,
                classSection: section
           });
@@ -449,9 +495,8 @@ router.get(
               _id: `history-${date.getTime()}`,
               date: date,
               classSection: section,
-              studentCount: count.length,
-              // Legacy fields stub
-              students: [] 
+              studentCount: studentCount.length, // Total count in class
+              students: Array.from(studentMap.values()) // The actual data for this user/users
           };
       }));
 

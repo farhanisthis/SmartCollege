@@ -47,6 +47,7 @@ interface ProfileData {
     rollNumber?: string;
     createdAt: string;
     passwordChangedAt?: string;
+    profilePicture?: string;
   };
   stats: {
     assignmentsCompleted: number;
@@ -63,6 +64,9 @@ export default function Profile() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
   const [formData, setFormData] = useState({
     name: "",
     username: "",
@@ -122,6 +126,64 @@ export default function Profile() {
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleImageClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImageChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Image size must be less than 5MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("picture", file);
+
+    setIsUploading(true);
+    try {
+      const response = await fetch("/api/profile/picture", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (profileData) {
+          setProfileData({
+            ...profileData,
+            user: { ...profileData.user, profilePicture: data.profilePicture },
+          });
+        }
+        toast({
+          title: "Success",
+          description: "Profile picture updated successfully",
+        });
+      } else {
+        throw new Error("Failed to upload image");
+      }
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      toast({
+        title: "Error",
+        description: "Failed to upload image",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+      // Reset input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
   };
 
   const handleSave = async () => {
@@ -385,9 +447,16 @@ export default function Profile() {
               <CardContent className="pt-6">
                 <div className="flex flex-col items-center text-center">
                   <div className="relative">
-                    <div className="w-24 h-24 rounded-full border-4 border-[#f54c4c] p-1 flex items-center justify-center">
+                    <div className="w-24 h-24 rounded-full border-4 border-[#f54c4c] p-1 flex items-center justify-center relative">
+                        <input 
+                            type="file" 
+                            ref={fileInputRef} 
+                            onChange={handleImageChange}
+                            accept="image/*"
+                            className="hidden"
+                        />
                         <Avatar className="h-full w-full">
-                        <AvatarImage src="" alt={profileData.user.name} />
+                        <AvatarImage src={profileData.user.profilePicture || ""} alt={profileData.user.name} className="object-cover" />
                         <AvatarFallback className="text-2xl font-black bg-white text-[#f54c4c]">
                             {profileData.user.name
                             ?.split(" ")
@@ -395,12 +464,19 @@ export default function Profile() {
                             .join("")}
                         </AvatarFallback>
                         </Avatar>
+                        {isUploading && (
+                             <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center">
+                                 <Loader2 className="h-6 w-6 text-white animate-spin" />
+                             </div>
+                        )}
                     </div>
                     {isEditing && (
                       <Button
                         size="icon"
                         variant="secondary"
+                        onClick={handleImageClick}
                         className="absolute bottom-0 right-0 h-8 w-8 rounded-full border-2 border-white shadow-lg bg-[#f54c4c] text-white hover:bg-[#d43f3f]"
+                        disabled={isUploading}
                       >
                         <Camera className="h-4 w-4" />
                       </Button>
