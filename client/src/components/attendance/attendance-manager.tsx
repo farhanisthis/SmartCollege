@@ -145,7 +145,9 @@ const getSubjectsForDay = (schedule: any, dayName: string) => {
       daySchedule &&
       daySchedule.text &&
       daySchedule.text !== "" &&
-      daySchedule.text !== "-"  // Only skip empty slots marked with "-"
+      daySchedule.text !== "" &&
+      daySchedule.text !== "-" && // Only skip empty slots marked with "-"
+      daySchedule.text !== "BREAK" // Skip BREAK slots for attendance
     ) {
       subjects.push({
         time: timeSlot,
@@ -247,7 +249,27 @@ export default function AttendanceManager() {
       return customSchedule[dateKey];
     }
     // Fallback to day-of-week based default schedule or custom day-of-week override if we implemented that
-    return getSubjectsForDay(timetableSchedule, dayName);
+    // Fallback to day-of-week based default schedule
+    const subjects = getSubjectsForDay(timetableSchedule, dayName);
+
+    // Sort subjects chronologically
+    return subjects.sort((a, b) => {
+      const getStartTime = (timeStr: string) => {
+        const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/);
+        if (!match) return 0;
+        
+        let hours = parseInt(match[1]);
+        const minutes = parseInt(match[2]);
+        const period = match[3];
+        
+        if (period === 'PM' && hours !== 12) hours += 12;
+        if (period === 'AM' && hours === 12) hours = 0;
+        
+        return hours * 60 + minutes;
+      };
+      
+      return getStartTime(a.time) - getStartTime(b.time);
+    });
   }, [dayName, date, customSchedule, timetableSchedule]);
 
 
@@ -689,11 +711,11 @@ export default function AttendanceManager() {
 
   if (isMobile) {
     return (
-      <div className="min-h-screen bg-white pb-32">
-        <div className="px-4 pt-6 space-y-6">
+      <div className="min-h-screen bg-white pb-24">
+        <div className="px-4 pt-4 space-y-4">
           <MobileAttendanceHeader
             dayName={dayName}
-            date={date}
+            selectedDate={date}
             stats={stats}
             totalStudents={students.length}
             currentSubject={currentActiveSubject}
@@ -778,28 +800,21 @@ export default function AttendanceManager() {
         </div>
 
         {/* Sticky Footer */}
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-xl border-t border-gray-100 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] z-50">
-           <div className="flex items-center gap-3">
+        <div className="fixed bottom-0 left-0 right-0 p-2 bg-white/80 backdrop-blur-xl border-t border-gray-100 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] z-50">
+           <div className="flex items-center gap-2">
              <Button 
                 onClick={handleSaveAttendance}
                 disabled={isSaving}
-                className="flex-1 h-16 bg-[#ea580c] hover:bg-[#c2410c] text-white rounded-[1.5rem] shadow-xl shadow-orange-200 font-black text-lg flex items-center justify-center gap-2 active:scale-95 transition-all"
+                className="w-full h-10 bg-[#ea580c] hover:bg-[#c2410c] text-white rounded-lg shadow-sm shadow-orange-200 font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition-all"
              >
-               <Save className="h-6 w-6" />
-               {isSaving ? "Saving..." : "Save Attendance"}
-             </Button>
-             <Button 
-                variant="secondary" 
-                className="h-16 w-16 rounded-[1.5rem] bg-slate-100 hover:bg-slate-200 text-slate-500"
-                onClick={handleExport}
-             >
-               <Download className="h-6 w-6" />
+               <Save className="h-4 w-4" />
+               {isSaving ? "Saving..." : "Save attendance"}
              </Button>
            </div>
            
            {/* Visual Bottom Nav Indicator (as per mock) */}
-           <div className="flex justify-center mt-6 mb-2">
-             <div className="w-32 h-1.5 bg-slate-200 rounded-full" />
+           <div className="flex justify-center mt-1.5 mb-0.5">
+             <div className="w-20 h-1 bg-slate-200 rounded-full" />
            </div>
         </div>
 

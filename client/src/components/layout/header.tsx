@@ -48,14 +48,14 @@ export default function Header({ onCreateUpdate }: HeaderProps) {
       data-testid="header"
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          <div className="flex items-center space-x-3">
-            <div className="bg-[#f54c4c] p-2 rounded-xl shadow-sm">
-              <GraduationCap className="h-6 w-6 text-white" />
+        <div className="flex justify-between items-center h-14">
+          <div className="flex items-center space-x-2">
+            <div className="bg-[#f54c4c] p-1.5 rounded-lg shadow-sm">
+              <GraduationCap className="h-5 w-5 text-white" />
             </div>
             <div className="flex flex-col">
-              <h1 className="text-lg font-black text-foreground leading-none tracking-tight">Smart College</h1>
-              <span className="text-[10px] font-black text-[#f54c4c] uppercase tracking-widest mt-0.5">
+              <h1 className="text-base font-black text-foreground leading-none tracking-tight">Smart College</h1>
+              <span className="text-[9px] font-black text-[#f54c4c] uppercase tracking-widest mt-0.5">
                 {user?.role === "cr" ? "CR Dashboard" : "Student Portal"}
               </span>
             </div>
@@ -101,10 +101,10 @@ export default function Header({ onCreateUpdate }: HeaderProps) {
                     className="flex items-center space-x-2 p-0 h-auto hover:bg-transparent"
                     data-testid="button-user-menu"
                   >
-                    <div className="w-10 h-10 rounded-full border-2 border-[#f54c4c] p-0.5 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-full border-2 border-[#f54c4c] p-0.5 flex items-center justify-center">
                         <Avatar className="h-full w-full">
                         <AvatarImage src="" alt={user.name} />
-                        <AvatarFallback className="bg-white text-[#f54c4c] font-bold text-xs" data-testid="user-avatar">
+                        <AvatarFallback className="bg-white text-[#f54c4c] font-bold text-[10px]" data-testid="user-avatar">
                             {user.name
                             .split(" ")
                             .map((n) => n[0])

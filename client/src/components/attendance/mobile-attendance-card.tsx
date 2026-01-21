@@ -42,17 +42,17 @@ export function MobileAttendanceCard({
   return (
     <Card className="overflow-hidden border-none shadow-sm bg-white/50 backdrop-blur-sm rounded-3xl mb-4">
       {/* Part 1: Top - Fixed Student Details */}
-      <div className="p-5 border-b border-gray-100 bg-white/80">
+      <div className="p-2.5 border-b border-gray-100 bg-white/80">
         <div className="flex justify-between items-start">
           <div>
-            <h3 className="font-bold text-gray-900 text-lg leading-tight">
+            <h3 className="font-bold text-gray-900 text-sm leading-tight">
               {student.name}
             </h3>
-            <p className="text-sm font-medium text-gray-500 mt-1">
+            <p className="text-[10px] font-medium text-gray-500 mt-0.5">
               {student.enrollment}
             </p>
           </div>
-          <div className="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded-full px-3">
+          <div className="text-[9px] text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">
             {student.email.split('@')[0]}
           </div>
         </div>
@@ -76,13 +76,13 @@ export function MobileAttendanceCard({
 
               return (
                 <CarouselItem key={`${student.id}-${subject.subject}`}>
-                  <div className="p-6 flex flex-col items-center justify-center min-h-[220px]">
+                  <div className="p-3 flex flex-col items-center justify-center min-h-[140px]">
                     {/* Subject Header */}
-                    <div className="text-center mb-6 w-full">
-                      <div className={`text-base font-black px-4 py-1.5 rounded-full inline-block mb-2 bg-gradient-to-r ${subject.bg} bg-opacity-10 text-white uppercase tracking-wider text-[10px] shadow-sm`}>
+                    <div className="text-center mb-3 w-full">
+                      <div className={`text-xs font-black px-2.5 py-1 rounded-full inline-block mb-1 bg-gradient-to-r ${subject.bg} bg-opacity-10 text-white uppercase tracking-wider text-[8px] shadow-sm`}>
                         {subject.time.replace('\n—\n', ' - ')}
                       </div>
-                      <h4 className="text-xl font-bold text-gray-800 leading-tight">
+                      <h4 className="text-base font-bold text-gray-800 leading-tight">
                         {subject.subject}
                       </h4>
                     </div>
@@ -92,15 +92,15 @@ export function MobileAttendanceCard({
                       onClick={() => onToggleAttendance(student.id, subject.subject)}
                       className={cn(
                         "relative group transition-all duration-300 ease-out active:scale-95",
-                        "w-20 h-20 rounded-full flex items-center justify-center shadow-lg",
-                        status === 'present' ? "bg-green-500 shadow-green-200 ring-4 ring-green-100" :
-                        status === 'absent' ? "bg-red-500 shadow-red-200 ring-4 ring-red-100" :
+                        "w-14 h-14 rounded-full flex items-center justify-center shadow-lg",
+                        status === 'present' ? "bg-green-500 shadow-green-200 ring-2 ring-green-100" :
+                        status === 'absent' ? "bg-red-500 shadow-red-200 ring-2 ring-red-100" :
                         "bg-white border-4 border-gray-100 shadow-gray-200"
                       )}
                     >
-                        {status === 'present' && <Check className="w-10 h-10 text-white stroke-[3px]" />}
-                        {status === 'absent' && <X className="w-10 h-10 text-white stroke-[3px]" />}
-                        {status === undefined && <div className="w-4 h-4 rounded-full bg-gray-300 group-hover:bg-gray-400 transition-colors" />}
+                        {status === 'present' && <Check className="w-7 h-7 text-white stroke-[3px]" />}
+                        {status === 'absent' && <X className="w-7 h-7 text-white stroke-[3px]" />}
+                        {status === undefined && <div className="w-2.5 h-2.5 rounded-full bg-gray-300 group-hover:bg-gray-400 transition-colors" />}
                         
                         {/* Pulse effect when unmarked */}
                         {status === undefined && (
@@ -109,7 +109,7 @@ export function MobileAttendanceCard({
                     </button>
                     
                     <span className={cn(
-                      "mt-4 text-xs font-bold uppercase tracking-widest",
+                      "mt-2 text-[9px] font-bold uppercase tracking-widest",
                       statusColor
                     )}>
                       {status === 'present' ? 'Marked Present' : 

@@ -1,7 +1,25 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
+import { Loader2 } from "lucide-react";
 
-const E1Schedule = {
+// Safelist for Tailwind JIT to pick up dynamic database colors
+export const _colorSafelist = [
+  "from-violet-600 via-violet-500 to-purple-400",
+  "from-emerald-600 via-teal-500 to-cyan-400",
+  "from-sky-600 via-blue-500 to-indigo-400",
+  "from-sky-700 via-blue-600 to-indigo-500",
+  "from-lime-600 via-green-500 to-emerald-400",
+  "from-lime-700 via-green-600 to-emerald-500",
+  "from-purple-600 via-indigo-500 to-blue-400",
+  "from-purple-700 via-indigo-600 to-blue-500",
+  "from-purple-800 via-indigo-700 to-blue-600",
+  "from-amber-600 via-orange-500 to-red-400",
+  "from-amber-700 via-orange-600 to-red-500",
+  "from-rose-500 via-pink-400 to-red-300",
+];
+
+// Fallback hardcoded schedule (kept for backwards compatibility)
+const E1ScheduleFallback = {
   "10:30 AM\n—\n11:30 AM": {
     Monday: { text: "CG", bg: "from-green-600 via-green-500 to-green-400" },
     Thursday: { text: "CC", bg: "from-blue-600 via-blue-500 to-blue-400" },
@@ -93,8 +111,98 @@ const E1Schedule = {
 };
 
 export default function TimetableDisplay() {
-  const timeSlots = Object.keys(E1Schedule);
+  const [timetableSchedule, setTimetableSchedule] = useState<any>(E1ScheduleFallback);
+  const [isLoading, setIsLoading] = useState(true);
+  const [subjects, setSubjects] = useState<any[]>([]);
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+
+  // Fetch timetable from API
+  useEffect(() => {
+    const fetchTimetable = async () => {
+      try {
+        const response = await fetch("/api/timetable/E1", {
+          credentials: "include",
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.data) {
+            // Build schedule object from API data
+            const schedule: Record<string, Record<string, { text: string; bg: string }>> = {};
+            const uniqueSubjects = new Map<string, { name: string; color: string }>();
+            
+            data.data.forEach((slot: any) => {
+              const timeKey = slot.timeSlot.replace(/ - /, "\n—\n");
+              
+              if (!schedule[timeKey]) {
+                schedule[timeKey] = {};
+              }
+              
+              schedule[timeKey][slot.day] = {
+                text: slot.subjectCode === "-" ? "" : slot.subjectCode,
+                bg: slot.subject?.color || "from-gray-600 via-gray-500 to-gray-400",
+              };
+
+              // Collect unique subjects for legend
+              if (slot.subject && slot.subjectCode !== "-") {
+                uniqueSubjects.set(slot.subjectCode, {
+                  name: slot.subject.name,
+                  color: slot.subject.color,
+                });
+              }
+            });
+            
+            setTimetableSchedule(schedule);
+            setSubjects(Array.from(uniqueSubjects.entries()).map(([code, data]) => ({
+              code,
+              ...data,
+            })));
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch timetable:", error);
+        // Keep using fallback schedule
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTimetable();
+  }, []);
+
+  // Sort time slots chronologically
+  const sortTimeSlots = (slots: string[]) => {
+    return slots.sort((a, b) => {
+      // Extract start time from "HH:MM AM/PM - HH:MM AM/PM" format
+      const getStartTime = (slot: string) => {
+        const match = slot.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/);
+        if (!match) return 0;
+        
+        let hours = parseInt(match[1]);
+        const minutes = parseInt(match[2]);
+        const period = match[3];
+        
+        // Convert to 24-hour format
+        if (period === 'PM' && hours !== 12) hours += 12;
+        if (period === 'AM' && hours === 12) hours = 0;
+        
+        return hours * 60 + minutes;
+      };
+      
+      return getStartTime(a) - getStartTime(b);
+    });
+  };
+
+  const timeSlots = sortTimeSlots(Object.keys(timetableSchedule));
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+        <span className="ml-2 text-gray-600">Loading timetable...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -134,10 +242,7 @@ export default function TimetableDisplay() {
 
                 {/* Schedule cells */}
                 {days.map((day) => {
-                  const daySchedule =
-                    E1Schedule[timeSlot as keyof typeof E1Schedule]?.[
-                      day as keyof (typeof E1Schedule)[keyof typeof E1Schedule]
-                    ];
+                  const daySchedule = timetableSchedule[timeSlot]?.[day];
                   const cellBg = daySchedule?.bg || "from-gray-800 to-gray-700";
                   const cellText = daySchedule?.text || "";
 
@@ -162,57 +267,23 @@ export default function TimetableDisplay() {
           </div>
 
           {/* Subject Legend */}
-          <div className="mt-6 space-y-4">
-            <h3 className="text-lg font-semibold text-gray-800">
-              Subject Legend
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded bg-gradient-to-br from-green-600 via-green-500 to-green-400"></div>
-                <span className="text-sm font-medium">
-                  CG - Computer Graphics
-                </span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded bg-gradient-to-br from-blue-600 via-blue-500 to-blue-400"></div>
-                <span className="text-sm font-medium">
-                  CC - Cloud Computing
-                </span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded bg-gradient-to-br from-purple-600 via-purple-500 to-purple-400"></div>
-                <span className="text-sm font-medium">
-                  OS - Operating System
-                </span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded bg-gradient-to-br from-orange-600 via-orange-500 to-orange-400"></div>
-                <span className="text-sm font-medium">
-                  ML - Machine Learning
-                </span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded bg-gradient-to-br from-green-700 via-green-600 to-green-500"></div>
-                <span className="text-sm font-medium">
-                  CG Lab 4 - Graphics Lab
-                </span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded bg-gradient-to-br from-orange-600 via-orange-500 to-orange-400"></div>
-                <span className="text-sm font-medium">ML Lab 4 - ML Lab</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded bg-gradient-to-br from-blue-700 via-blue-600 to-blue-500"></div>
-                <span className="text-sm font-medium">
-                  Linux Lab 4 - Linux Lab
-                </span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded bg-gradient-to-br from-red-500 via-red-400 to-red-300"></div>
-                <span className="text-sm font-medium">BREAK - Break Time</span>
+          {subjects.length > 0 && (
+            <div className="mt-6 space-y-4">
+              <h3 className="text-lg font-semibold text-gray-800">
+                Subject Legend
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {subjects.map((subject) => (
+                  <div key={subject.code} className="flex items-center gap-3">
+                    <div className={`w-6 h-6 rounded bg-gradient-to-br ${subject.color}`}></div>
+                    <span className="text-sm font-medium">
+                      {subject.code} - {subject.name}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
-          </div>
+          )}
 
           {/* Weekly Summary */}
           <div className="mt-6 p-4 bg-gray-50 rounded-lg">
@@ -222,22 +293,24 @@ export default function TimetableDisplay() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div className="bg-white p-3 rounded shadow-sm">
                 <div className="font-semibold text-gray-700">Total Classes</div>
-                <div className="text-2xl font-bold text-blue-600">28</div>
+                <div className="text-2xl font-bold text-blue-600">{timeSlots.length * days.length}</div>
                 <div className="text-xs text-gray-500">per week</div>
               </div>
               <div className="bg-white p-3 rounded shadow-sm">
                 <div className="font-semibold text-gray-700">Subjects</div>
-                <div className="text-2xl font-bold text-green-600">7</div>
+                <div className="text-2xl font-bold text-green-600">{subjects.length}</div>
                 <div className="text-xs text-gray-500">different subjects</div>
               </div>
               <div className="bg-white p-3 rounded shadow-sm">
                 <div className="font-semibold text-gray-700">Lab Sessions</div>
-                <div className="text-2xl font-bold text-purple-600">12</div>
+                <div className="text-2xl font-bold text-purple-600">
+                  {subjects.filter(s => s.code.includes('Lab')).length * 5}
+                </div>
                 <div className="text-xs text-gray-500">per week</div>
               </div>
               <div className="bg-white p-3 rounded shadow-sm">
                 <div className="font-semibold text-gray-700">Class Hours</div>
-                <div className="text-2xl font-bold text-orange-600">28</div>
+                <div className="text-2xl font-bold text-orange-600">{timeSlots.length * days.length}</div>
                 <div className="text-xs text-gray-500">per week</div>
               </div>
             </div>

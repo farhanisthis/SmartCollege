@@ -86,12 +86,12 @@ export const AttendanceSheetUploader: React.FC<
 
   const handleUpload = async () => {
     if (inputMethod === "file" && !selectedFile) {
-      alert("कृपया पहले attendance sheet file select करें");
+      alert("Please select an attendance sheet file first");
       return;
     }
 
     if (inputMethod === "text" && !attendanceText.trim()) {
-      alert("कृपया attendance text paste करें");
+      alert("Please paste attendance text");
       return;
     }
 
@@ -188,8 +188,8 @@ export const AttendanceSheetUploader: React.FC<
           AI Attendance Sheet Processor
         </CardTitle>
         <CardDescription>
-          Upload attendance sheet (Excel, CSV, PDF, Image, or Word) और AI
-          automatically attendance extract करके database में save करेगा
+          Upload attendance sheet (Excel, CSV, PDF, Image, or Word) and AI will
+          automatically extract attendance and save it to the database
         </CardDescription>
       </CardHeader>
 
@@ -427,7 +427,7 @@ export const AttendanceSheetUploader: React.FC<
                       ))}
                     {uploadResult.unmatchedStudents.length > 5 && (
                       <div className="text-xs text-muted-foreground mt-1">
-                        और {uploadResult.unmatchedStudents.length - 5}{" "}
+                        and {uploadResult.unmatchedStudents.length - 5}{" "}
                         students...
                       </div>
                     )}
@@ -492,20 +492,20 @@ export const AttendanceSheetUploader: React.FC<
             {inputMethod === "file" ? (
               <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
                 <li>
-                  Upload attendance sheet में student names और attendance status
-                  clearly visible होना चाहिए
+                  Student names and attendance status must be clearly visible in
+                  the uploaded attendance sheet
                 </li>
                 <li>
-                  AI automatically detect करेगा student names, subjects, और
+                  AI will automatically detect student names, subjects, and
                   present/absent status
                 </li>
-                <li>Students को database से automatically match किया जाएगा</li>
+                <li>Students will be automatically matched with the database</li>
                 <li>
                   Supported formats: Excel (.xlsx, .xls), CSV, PDF, Images (JPG,
                   PNG), Word (.docx)
                 </li>
                 <li>
-                  Processing में 1-2 minutes लग सकते हैं depending on file size
+                  Processing may take 1-2 minutes depending on file size
                 </li>
               </ul>
             ) : (
@@ -515,14 +515,14 @@ export const AttendanceSheetUploader: React.FC<
                   numbers, and status
                 </li>
                 <li>
-                  Format examples: "00124402023 Mohammad Asad CC: P, CG: P" या
-                  "Mohammad Asad - Present" या table format
+                  Format examples: "00124402023 Mohammad Asad CC: P, CG: P" or
+                  "Mohammad Asad - Present" or table format
                 </li>
                 <li>
                   AI will automatically parse student names, enrollment numbers,
-                  subjects, और attendance status
+                  subjects, and attendance status
                 </li>
-                <li>Use P/Present for present और A/Absent for absent</li>
+                <li>Use P/Present for present and A/Absent for absent</li>
                 <li>
                   Multiple subjects can be specified: "CC: P, CG: A, OS: P"
                 </li>
