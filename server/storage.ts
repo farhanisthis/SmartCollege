@@ -198,6 +198,7 @@ export class MemStorage implements IStorage {
       department: insertUser.department || null,
       year: insertUser.year || null,
       rollNumber: insertUser.rollNumber || null,
+      profilePicture: insertUser.profilePicture || null,
       preferences: insertUser.preferences || null,
     };
     this.users.set(id, user);
