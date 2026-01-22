@@ -322,20 +322,31 @@ export default function AttendanceManager() {
         const response = await fetch("/api/bulk-users/e1-students", {
            credentials: "include" 
         });
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.students) {
-            // Map backend user to Student interface (id mapped to _id)
-            const mappedStudents = data.students.map((s: any) => ({
-               id: s._id,
-               name: s.name,
-               email: s.email,
-               enrollment: s.enrollment || s.username, // fallback if enrollment missing
-               profilePicture: s.profilePicture,
-            }));
-            setStudents(mappedStudents);
+        
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+           if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.students) {
+              // Map backend user to Student interface (id mapped to _id)
+              const mappedStudents = data.students.map((s: any) => ({
+                 id: s._id,
+                 name: s.name,
+                 email: s.email,
+                 enrollment: s.enrollment || s.username, // fallback if enrollment missing
+                 profilePicture: s.profilePicture,
+              }));
+              setStudents(mappedStudents);
+            }
+          } else {
+             console.error("Fetch failed with status:", response.status);
           }
+        } else {
+           const text = await response.text();
+           console.error("Received non-JSON response:", text.substring(0, 500)); // Log first 500 chars
+           throw new Error("Expected JSON but received " + contentType);
         }
+
       } catch (err) {
         console.error("Failed to fetch students", err);
       } finally {

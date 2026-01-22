@@ -93,21 +93,33 @@ export default function Profile() {
           credentials: "include",
         });
 
-        if (response.ok) {
-          const data: ProfileData = await response.json();
-          setProfileData(data);
-          setFormData({
-            name: data.user.name || "",
-            username: data.user.username || "",
-            phone: data.user.phone || "",
-            location: data.user.location || "",
-            bio: data.user.bio || "",
-            department: data.user.department || "",
-            year: data.user.year || "",
-            rollNumber: data.user.rollNumber || "",
-          });
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+           if (response.ok) {
+            const data: ProfileData = await response.json();
+            setProfileData(data);
+            setFormData({
+              name: data.user.name || "",
+              username: data.user.username || "",
+              phone: data.user.phone || "",
+              location: data.user.location || "",
+              bio: data.user.bio || "",
+              department: data.user.department || "",
+              year: data.user.year || "",
+              rollNumber: data.user.rollNumber || "",
+            });
+           } else {
+             console.error("Profile fetch failed with status:", response.status);
+             if (response.status === 401) {
+                  // Optional: Redirect to login or show clear message
+                  throw new Error("Session expired. Please log in again.");
+             }
+             throw new Error("Failed to load profile");
+           }
         } else {
-          throw new Error("Failed to load profile");
+           const text = await response.text();
+           console.error("Profile received non-JSON response:", text.substring(0, 500));
+           throw new Error("Expected JSON but received " + contentType);
         }
       } catch (error) {
         console.error("Error loading profile:", error);
