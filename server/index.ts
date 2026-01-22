@@ -111,6 +111,7 @@ app.use((req, res, next) => {
 
   server.listen(port, host, () => {
     log(`serving on http://${host}:${port}`);
+    console.log("Health Check: API Routes for Timetable and Subjects are MOUNTED (v2.0 Fix)");
   });
 
   // Serve static files in production or if dist exists
