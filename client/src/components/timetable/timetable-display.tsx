@@ -22,94 +22,52 @@ export const _colorSafelist = [
 // Fallback hardcoded schedule (kept for backwards compatibility)
 const E1ScheduleFallback = {
   "10:30 AM\n—\n11:30 AM": {
-    Monday: { text: "CG", bg: "from-green-600 via-green-500 to-green-400" },
-    Thursday: { text: "CC", bg: "from-blue-600 via-blue-500 to-blue-400" },
+    Tuesday: { text: "IOT Lab1", bg: "from-sky-700 via-blue-600 to-indigo-500" },
+    Wednesday: { text: "IOT", bg: "from-lime-700 via-green-600 to-emerald-500" },
+    Thursday: { text: "IOT Lab1", bg: "from-sky-700 via-blue-600 to-indigo-500" },
   },
+
   "11:30 AM\n—\n12:30 PM": {
-    Monday: { text: "CC", bg: "from-blue-600 via-blue-500 to-blue-400" },
-    Tuesday: { text: "CG", bg: "from-green-600 via-green-500 to-green-400" },
-    Wednesday: {
-      text: "OS",
-      bg: "from-purple-600 via-purple-500 to-purple-400",
-    },
-    Thursday: {
-      text: "OS",
-      bg: "from-purple-600 via-purple-500 to-purple-400",
-    },
-    Friday: { text: "OS", bg: "from-purple-600 via-purple-500 to-purple-400" },
+    Monday: { text: "DVA 311\nDL 312", bg: "from-purple-700 via-indigo-600 to-blue-500" },
+    Tuesday: { text: "DVA 311\nDL 312", bg: "from-purple-700 via-indigo-600 to-blue-500" },
+    Wednesday: { text: "DVA 311\nDL 312", bg: "from-purple-700 via-indigo-600 to-blue-500" },
+    Thursday: { text: "DVA 311\nDL 312", bg: "from-purple-700 via-indigo-600 to-blue-500" },
+    Friday: { text: "IOT Lab1", bg: "from-sky-700 via-blue-600 to-indigo-500" },
   },
+
   "12:30 PM\n—\n01:30 PM": {
-    Monday: { text: "OS", bg: "from-purple-600 via-purple-500 to-purple-400" },
-    Tuesday: { text: "CC", bg: "from-blue-600 via-blue-500 to-blue-400" },
-    Wednesday: { text: "CG", bg: "from-green-600 via-green-500 to-green-400" },
-    Thursday: { text: "CG", bg: "from-green-600 via-green-500 to-green-400" },
-    Friday: { text: "CC", bg: "from-blue-600 via-blue-500 to-blue-400" },
+    Monday: { text: "IOT", bg: "from-lime-700 via-green-600 to-emerald-500" },
+    Tuesday: { text: "BREAK", bg: "from-rose-500 via-pink-400 to-red-300" },
+    Wednesday: { text: "BREAK", bg: "from-rose-500 via-pink-400 to-red-300" },
+    Thursday: { text: "BREAK", bg: "from-rose-500 via-pink-400 to-red-300" },
+    Friday: { text: "IOT", bg: "from-lime-700 via-green-600 to-emerald-500" },
   },
+
   "01:30 PM\n—\n02:30 PM": {
-    Monday: { text: "BREAK", bg: "from-red-500 via-red-400 to-red-300" },
-    Tuesday: { text: "BREAK", bg: "from-red-500 via-red-400 to-red-300" },
-    Wednesday: {
-      text: "CG Lab 4",
-      bg: "from-green-700 via-green-600 to-green-500",
-    },
-    Thursday: { text: "BREAK", bg: "from-red-500 via-red-400 to-red-300" },
-    Friday: { text: "BREAK", bg: "from-red-500 via-red-400 to-red-300" },
+    Monday: { text: "BREAK", bg: "from-rose-500 via-pink-400 to-red-300" },
+    Tuesday: { text: "IOT", bg: "from-lime-700 via-green-600 to-emerald-500" },
+    Wednesday: { text: "DVA Lab 4\nDL Lab 5", bg: "from-amber-700 via-orange-600 to-red-500" },
+    Thursday: { text: "DWDM", bg: "from-violet-700 via-purple-600 to-indigo-500" },
+    Friday: { text: "DVA Lab 4\nDL Lab 5", bg: "from-amber-700 via-orange-600 to-red-500" },
   },
+
   "02:30 PM\n—\n03:30 PM": {
-    Monday: {
-      text: "CG Lab 4",
-      bg: "from-green-700 via-green-600 to-green-500",
-    },
-    Tuesday: {
-      text: "CG Lab 4",
-      bg: "from-green-700 via-green-600 to-green-500",
-    },
-    Wednesday: { text: "BREAK", bg: "from-red-500 via-red-400 to-red-300" },
-    Thursday: {
-      text: "CG Lab 4",
-      bg: "from-green-700 via-green-600 to-green-500",
-    },
-    Friday: {
-      text: "ML Lab 4",
-      bg: "from-orange-600 via-orange-500 to-orange-400",
-    },
+    Monday: { text: "IOT Lab1", bg: "from-sky-700 via-blue-600 to-indigo-500" },
+    Tuesday: { text: "DWDM", bg: "from-violet-700 via-purple-600 to-indigo-500" },
+    Wednesday: { text: "DWDM", bg: "from-violet-700 via-purple-600 to-indigo-500" },
+    Thursday: { text: "e-com", bg: "from-emerald-600 via-teal-500 to-cyan-400" },
+    Friday: { text: "DWDM", bg: "from-violet-700 via-purple-600 to-indigo-500" },
   },
+
   "03:30 PM\n—\n04:30 PM": {
-    Monday: { text: "ML", bg: "from-orange-600 via-orange-500 to-orange-400" },
-    Tuesday: {
-      text: "Linux Lab 4",
-      bg: "from-blue-700 via-blue-600 to-blue-500",
-    },
-    Wednesday: {
-      text: "Linux Lab 4",
-      bg: "from-blue-700 via-blue-600 to-blue-500",
-    },
-    Thursday: {
-      text: "ML",
-      bg: "from-orange-600 via-orange-500 to-orange-400",
-    },
-    Friday: {
-      text: "Linux Lab 4",
-      bg: "from-blue-700 via-blue-600 to-blue-500",
-    },
-  },
-  "04:30 PM\n—\n05:30 PM": {
-    Monday: {
-      text: "ML Lab 4",
-      bg: "from-orange-600 via-orange-500 to-orange-400",
-    },
-    Tuesday: { text: "", bg: "from-gray-800 to-gray-700" },
-    Wednesday: {
-      text: "ML",
-      bg: "from-orange-600 via-orange-500 to-orange-400",
-    },
-    Thursday: {
-      text: "Linux Lab 4",
-      bg: "from-blue-700 via-blue-600 to-blue-500",
-    },
-    Friday: { text: "ML", bg: "from-orange-600 via-orange-500 to-orange-400" },
+    Monday: { text: "e-com", bg: "from-emerald-600 via-teal-500 to-cyan-400" },
+    Tuesday: { text: "e-com", bg: "from-emerald-600 via-teal-500 to-cyan-400" },
+    Wednesday: { text: "e-com", bg: "from-emerald-600 via-teal-500 to-cyan-400" },
+    Thursday: { text: "MP Lab1", bg: "from-purple-800 via-indigo-700 to-blue-600" },
+    Friday: { text: "MP 212", bg: "from-purple-600 via-indigo-500 to-blue-400" },
   },
 };
+
 
 export default function TimetableDisplay() {
   const [timetableSchedule, setTimetableSchedule] = useState<any>(E1ScheduleFallback);

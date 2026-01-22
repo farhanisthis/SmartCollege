@@ -1405,6 +1405,12 @@ Please provide a well-formatted, enhanced version with:
   // Bulk user management routes
   app.use("/api/bulk-users", bulkUsersRoutes);
 
+  // Subject management routes
+  app.use("/api/subjects", subjectsRoutes);
+
+  // Timetable management routes
+  app.use("/api/timetable", timetableRoutes);
+
   // Memory monitoring endpoint for debugging
   app.get("/api/health/memory", (req, res) => {
     const memUsage = process.memoryUsage();

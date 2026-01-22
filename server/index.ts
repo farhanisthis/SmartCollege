@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
+import fs from "fs";
 import { registerRoutes } from "./routes";
 
 import { initializeWebSocket } from "./services/websocket";
