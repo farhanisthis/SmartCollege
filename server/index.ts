@@ -111,6 +111,22 @@ app.use((req, res, next) => {
   server.listen(port, host, () => {
     log(`serving on http://${host}:${port}`);
   });
+
+  // Serve static files in production or if dist exists
+  const distPath = path.join(process.cwd(), "..", "client", "dist");
+  if (process.env.NODE_ENV === "production" || fs.existsSync(distPath)) {
+    console.log(`[Static] Serving files from: ${distPath}`);
+    app.use(express.static(distPath));
+
+    // Fallback for SPA routing - must be after API routes
+    app.get("*", (_req, res) => {
+      // Don't intercept API calls that might have missed the router (404s)
+      if (_req.path.startsWith("/api")) {
+         return res.status(404).json({ message: "API endpoint not found" });
+      }
+      res.sendFile(path.join(distPath, "index.html"));
+    });
+  }
 })();
 
 function log(message: string, source = "express") {
