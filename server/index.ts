@@ -122,8 +122,12 @@ app.use((req, res, next) => {
 
     // Fallback for SPA routing - must be after API routes
     app.get("*", (_req, res) => {
+      // DEBUG: Log why we are hitting the catch-all
+      console.log(`[SPA Catch-all] Request: ${_req.method} ${_req.path}`);
+
       // Don't intercept API calls that might have missed the router (404s)
       if (_req.path.startsWith("/api")) {
+         console.log(`[SPA Catch-all] Blocking API request: ${_req.path} -> 404 JSON`);
          return res.status(404).json({ message: "API endpoint not found" });
       }
       res.sendFile(path.join(distPath, "index.html"));
