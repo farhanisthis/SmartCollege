@@ -54,7 +54,7 @@ async function updateTimetableFromImage() {
       { day: "Thursday", timeSlot: "10:30 AM - 11:30 AM", subjectCode: "IOT Lab1" },
       { day: "Thursday", timeSlot: "11:30 AM - 12:30 PM", subjectCode: "DVA 311" },
       { day: "Thursday", timeSlot: "12:30 PM - 01:30 PM", subjectCode: "BREAK" },
-      { day: "Thursday", timeSlot: "01:30 PM - 02:30 PM", subjectCode: "DVA Lab 4" },
+      { day: "Thursday", timeSlot: "01:30 PM - 02:30 PM", subjectCode: "DWDM" },
       { day: "Thursday", timeSlot: "02:30 PM - 03:30 PM", subjectCode: "e-com" },
       { day: "Thursday", timeSlot: "03:30 PM - 04:30 PM", subjectCode: "MP Lab1" },
       
@@ -62,9 +62,9 @@ async function updateTimetableFromImage() {
       { day: "Friday", timeSlot: "10:30 AM - 11:30 AM", subjectCode: "-" },
       { day: "Friday", timeSlot: "11:30 AM - 12:30 PM", subjectCode: "IOT Lab1" },
       { day: "Friday", timeSlot: "12:30 PM - 01:30 PM", subjectCode: "IOT" },
-      { day: "Friday", timeSlot: "01:30 PM - 02:30 PM", subjectCode: "-" },
+      { day: "Friday", timeSlot: "01:30 PM - 02:30 PM", subjectCode: "DVA Lab 4" },
       { day: "Friday", timeSlot: "02:30 PM - 03:30 PM", subjectCode: "DWDM" },
-      { day: "Friday", timeSlot: "03:30 PM - 04:30 PM", subjectCode: "-" },
+      { day: "Friday", timeSlot: "03:30 PM - 04:30 PM", subjectCode: "MP 212" },
     ];
 
     console.log("\nInserting timetable slots...\n");
