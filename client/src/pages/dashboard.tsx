@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/layout/header";
 import Sidebar from "@/components/layout/sidebar";
 
+import MobileCreateFab from "@/components/layout/mobile-create-fab";
 import UpdateCard from "@/components/updates/update-card";
 import PerformanceDashboard from "./performance-dashboard";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
@@ -402,37 +403,37 @@ export default function Dashboard() {
             {/* Page Header */}
             <div className="flex items-center justify-between mb-8 pt-4">
               <div>
-                <h2 className="text-2xl font-black text-foreground tracking-tight">Updates</h2>
-                <p className="text-[10px] text-muted-foreground font-bold mt-0.5">
+                <h2 className="text-4xl font-black text-foreground tracking-tight">Updates</h2>
+                <p className="text-sm text-muted-foreground font-black mt-1">
                   Semester 5 • Computer Science
                 </p>
               </div>
-              
-              {isCR && activeTab === 'performance' && (
+
+              {isCR && (
                 <Button
                     onClick={() => setIsCreateModalOpen(true)}
-                    className="bg-[#f54c4c] hover:bg-[#d43f3f] h-12 w-12 rounded-xl shadow-lg shadow-red-200 flex items-center justify-center p-0 transition-all active:scale-95 animate-in zoom-in duration-300"
+                    className="bg-[#f54c4c] hover:bg-[#d43f3f] h-14 w-14 rounded-2xl shadow-lg flex items-center justify-center p-0 transition-all active:scale-95"
                 >
-                    <Plus className="h-6 w-6 text-white" />
+                    <Plus className="h-8 w-8 text-white" />
                 </Button>
               )}
             </div>
 
             {/* Top Navigation Tabs */}
-            <div className="flex items-center gap-4 mb-4 border-b border-border/50">
+            <div className="flex items-center gap-6 mb-8 border-b border-border/50">
               <button 
                 onClick={() => setActiveTab("updates")}
-                className={`pb-2 text-[10px] font-black uppercase tracking-widest transition-all relative ${activeTab === "updates" ? "text-[#f54c4c]" : "text-muted-foreground/40 hover:text-muted-foreground"}`}
+                className={`pb-4 text-sm font-black uppercase tracking-widest transition-all relative ${activeTab === "updates" ? "text-[#f54c4c]" : "text-muted-foreground/40 hover:text-muted-foreground"}`}
               >
                 Updates
-                {activeTab === "updates" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#f54c4c] rounded-t-full" />}
+                {activeTab === "updates" && <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#f54c4c] rounded-t-full" />}
               </button>
               <button 
                 onClick={() => setActiveTab("performance")}
-                className={`pb-2 text-[10px] font-black uppercase tracking-widest transition-all relative ${activeTab === "performance" ? "text-[#f54c4c]" : "text-muted-foreground/40 hover:text-muted-foreground"}`}
+                className={`pb-4 text-sm font-black uppercase tracking-widest transition-all relative ${activeTab === "performance" ? "text-[#f54c4c]" : "text-muted-foreground/40 hover:text-muted-foreground"}`}
               >
                 Performance
-                {activeTab === "performance" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#f54c4c] rounded-t-full" />}
+                {activeTab === "performance" && <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#f54c4c] rounded-t-full" />}
               </button>
             </div>
 
@@ -442,53 +443,45 @@ export default function Dashboard() {
                   /* Mobile View: Simple List with Pill Filters */
                   <>
                     {/* Pill Filters */}
-                    <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1 scrollbar-hide">
+                    <div className="flex items-center gap-3 mb-10 overflow-x-auto pb-2 scrollbar-hide">
                       <Button 
                         variant={selectedCategory === "all" ? "default" : "outline"}
-                        className={`flex items-center gap-1.5 h-8 text-[10px] font-bold rounded-lg px-3 ${selectedCategory === "all" ? "bg-[#f54c4c] border-transparent" : "bg-white text-foreground border-border"}`}
+                        className={`flex items-center gap-2 ${selectedCategory === "all" ? "bg-[#f54c4c] border-transparent" : "bg-white text-foreground border-border"}`}
                         onClick={() => setSelectedCategory("all")}
                       >
-                        <Megaphone className="h-3 w-3" />
+                        <Megaphone className="h-4 w-4" />
                         All Updates
                       </Button>
                       <Button 
-                        variant={selectedCategory === "general" ? "default" : "outline"}
-                        className={`flex items-center gap-1.5 h-8 text-[10px] font-bold rounded-lg px-3 ${selectedCategory === "general" ? "bg-[#f54c4c] border-transparent" : "bg-white text-muted-foreground border-border"}`}
-                        onClick={() => setSelectedCategory("general")}
-                      >
-                        <Megaphone className="h-3 w-3" />
-                        General
-                      </Button>
-                      <Button 
                         variant={selectedCategory === "assignments" ? "default" : "outline"}
-                        className={`flex items-center gap-1.5 h-8 text-[10px] font-bold rounded-lg px-3 ${selectedCategory === "assignments" ? "bg-[#f54c4c] border-transparent" : "bg-white text-muted-foreground border-border"}`}
+                        className={`flex items-center gap-2 ${selectedCategory === "assignments" ? "bg-[#f54c4c] border-transparent" : "bg-white text-muted-foreground border-border"}`}
                         onClick={() => setSelectedCategory("assignments")}
                       >
-                        <ClipboardList className="h-3 w-3" />
+                        <ClipboardList className="h-4 w-4" />
                         Assignments
                       </Button>
                       <Button 
                         variant={selectedCategory === "notes" ? "default" : "outline"}
-                        className={`flex items-center gap-1.5 h-8 text-[10px] font-bold rounded-lg px-3 ${selectedCategory === "notes" ? "bg-[#f54c4c] border-transparent" : "bg-white text-muted-foreground border-border"}`}
+                        className={`flex items-center gap-2 ${selectedCategory === "notes" ? "bg-[#f54c4c] border-transparent" : "bg-white text-muted-foreground border-border"}`}
                         onClick={() => setSelectedCategory("notes")}
                       >
-                        <StickyNote className="h-3 w-3" />
+                        <StickyNote className="h-4 w-4" />
                         Notes
                       </Button>
                       <Button 
                         variant={selectedCategory === "presentations" ? "default" : "outline"}
-                        className={`flex items-center gap-1.5 h-8 text-[10px] font-bold rounded-lg px-3 ${selectedCategory === "presentations" ? "bg-[#f54c4c] border-transparent" : "bg-white text-muted-foreground border-border"}`}
+                        className={`flex items-center gap-2 ${selectedCategory === "presentations" ? "bg-[#f54c4c] border-transparent" : "bg-white text-muted-foreground border-border"}`}
                         onClick={() => setSelectedCategory("presentations")}
                       >
-                        <BarChart className="h-3 w-3" />
+                        <BarChart className="h-4 w-4" />
                         Presentations
                       </Button>
                     </div>
 
                     {/* Feed Section Header */}
-                    <div className="flex items-center justify-between mb-2 px-1">
-                      <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Recent Feed</span>
-                      <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">{updates.length} Total</span>
+                    <div className="flex items-center justify-between mb-4 px-1">
+                      <span className="text-[11px] font-black text-muted-foreground uppercase tracking-widest">Recent Feed</span>
+                      <span className="text-[11px] font-black text-muted-foreground uppercase tracking-widest">{updates.length} Total</span>
                     </div>
 
                     {/* Updates List */}
@@ -689,17 +682,9 @@ export default function Dashboard() {
           stats={stats}
         />
       )} */}
-      {/* Mobile Floating Action Button - Only for CR and only on Updates tab */}
-      {isCR && activeTab === 'updates' && (
-        <div className="fixed bottom-6 right-6 z-50">
-           <Button
-               onClick={() => setIsCreateModalOpen(true)}
-               className="bg-[#f54c4c] hover:bg-[#d43f3f] h-14 w-14 rounded-2xl shadow-xl shadow-red-200 flex items-center justify-center p-0 transition-all active:scale-95 animate-in zoom-in duration-300"
-           >
-               <Plus className="h-7 w-7 text-white" />
-           </Button>
-        </div>
-      )}
+
+      {/* Mobile Floating Action Button */}
+      <MobileCreateFab onCreateUpdate={() => setIsCreateModalOpen(true)} />
 
       {/* Create Update Modal */}
       {isCR && (

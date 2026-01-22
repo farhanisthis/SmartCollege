@@ -9,3 +9,8 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+# Environment variable instructions:
+# 1. Go to Netlify dashboard > Site settings > Environment variables
+# 2. Add: VITE_API_URL = https://your-render-backend-url.onrender.com
+# 3. Rebuild the site after adding the variable

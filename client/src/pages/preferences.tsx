@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { getApiUrl } from "@/lib/queryClient";
 import {
   Select,
   SelectContent,
@@ -100,7 +101,7 @@ export default function Preferences() {
   useEffect(() => {
     const loadPreferences = async () => {
       try {
-        const response = await fetch("/api/preferences", {
+        const response = await fetch(getApiUrl("/api/preferences"), {
           credentials: "include",
         });
 
@@ -154,7 +155,7 @@ export default function Preferences() {
         timezone,
       };
 
-      const response = await fetch("/api/preferences", {
+      const response = await fetch(getApiUrl("/api/preferences"), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -215,15 +216,17 @@ export default function Preferences() {
               </Button>
               <div className="flex items-center space-x-2">
                 <div className="bg-[#f54c4c] p-1.5 rounded-lg">
-                    <GraduationCap className="h-4 w-4 text-white" />
+                  <GraduationCap className="h-4 w-4 text-white" />
                 </div>
-                <h1 className="text-base font-black tracking-tight">Preferences</h1>
+                <h1 className="text-base font-black tracking-tight">
+                  Preferences
+                </h1>
               </div>
             </div>
-            <Button 
-                onClick={handleSave} 
-                disabled={isSaving}
-                className="bg-[#f54c4c] hover:bg-[#d43f3f] text-white rounded-2xl h-11 px-6 font-bold transition-all active:scale-95"
+            <Button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="bg-[#f54c4c] hover:bg-[#d43f3f] text-white rounded-2xl h-11 px-6 font-bold transition-all active:scale-95"
             >
               {isSaving ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />

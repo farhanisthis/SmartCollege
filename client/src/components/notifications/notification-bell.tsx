@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/popover";
 import { Bell } from "lucide-react";
 import NotificationSystem from "./notification-system";
+import { getApiUrl } from "@/lib/queryClient";
 
 interface NotificationBellProps {
   className?: string;
@@ -22,7 +23,9 @@ const NotificationBell: React.FC<NotificationBellProps> = ({
   // Fetch unread notification count
   const fetchUnreadCount = async () => {
     try {
-      const response = await fetch("/api/notifications/unread-count");
+      const response = await fetch(
+        getApiUrl("/api/notifications/unread-count"),
+      );
       if (response.ok) {
         const data = await response.json();
         setUnreadCount(data.count);

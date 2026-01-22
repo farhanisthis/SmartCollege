@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
+import { getApiUrl } from "@/lib/queryClient";
 import {
   Dialog,
   DialogContent,
@@ -93,7 +94,7 @@ interface AttendanceData {
 export default function StudentAttendanceTracker() {
   const { user } = useAuth();
   const [attendanceData, setAttendanceData] = useState<AttendanceData | null>(
-    null
+    null,
   );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -156,10 +157,10 @@ export default function StudentAttendanceTracker() {
     for (const record of rawData) {
       // Find student record matching either ID or Enrollment
       const studentRecord = record.students?.find(
-        (s: any) => 
-          s.studentId === currentUserId || 
+        (s: any) =>
+          s.studentId === currentUserId ||
           s.studentId === enrollment ||
-          (s.enrollment && s.enrollment === enrollment)
+          (s.enrollment && s.enrollment === enrollment),
       );
 
       if (studentRecord) {
@@ -176,7 +177,7 @@ export default function StudentAttendanceTracker() {
             (normalizedStatus !== "present" && normalizedStatus !== "absent")
           ) {
             console.log(
-              `Skipping invalid data: subject=${normalizedSubject}, status=${normalizedStatus}`
+              `Skipping invalid data: subject=${normalizedSubject}, status=${normalizedStatus}`,
             );
             continue;
           }
@@ -258,8 +259,8 @@ export default function StudentAttendanceTracker() {
       last7DaysPercentage > previous7DaysPercentage
         ? "improving"
         : last7DaysPercentage < previous7DaysPercentage
-        ? "declining"
-        : "stable";
+          ? "declining"
+          : "stable";
 
     // Find attendance streak (consecutive days with at least one present subject)
     const dailyAttendance = new Map();
@@ -278,7 +279,7 @@ export default function StudentAttendanceTracker() {
     for (const dateStr of sortedDates) {
       const dayRecords = dailyAttendance.get(dateStr);
       const hasPresentClass = dayRecords.some(
-        (r: any) => r.status === "present"
+        (r: any) => r.status === "present",
       );
 
       if (hasPresentClass) {
@@ -338,10 +339,10 @@ export default function StudentAttendanceTracker() {
       }
 
       const response = await fetch(
-        `/api/attendance/history?${params.toString()}`,
+        getApiUrl(`/api/attendance/history?${params.toString()}`),
         {
           credentials: "include",
-        }
+        },
       );
 
       if (!response.ok) {
@@ -458,8 +459,8 @@ export default function StudentAttendanceTracker() {
   const subjects = attendanceData
     ? Array.from(
         new Set(
-          attendanceData.attendanceHistory.map((record) => record.subject)
-        )
+          attendanceData.attendanceHistory.map((record) => record.subject),
+        ),
       )
     : [];
 
@@ -625,7 +626,7 @@ export default function StudentAttendanceTracker() {
                 </p>
                 <p
                   className={`text-2xl font-bold ${getAttendanceColor(
-                    statistics.overallPercentage
+                    statistics.overallPercentage,
                   )}`}
                 >
                   {statistics.overallPercentage.toFixed(1)}%
@@ -633,12 +634,12 @@ export default function StudentAttendanceTracker() {
               </div>
               <div
                 className={`p-3 rounded-full ${getAttendanceBgColor(
-                  statistics.overallPercentage
+                  statistics.overallPercentage,
                 )}`}
               >
                 <BarChart3
                   className={`h-6 w-6 ${getAttendanceColor(
-                    statistics.overallPercentage
+                    statistics.overallPercentage,
                   )}`}
                 />
               </div>
@@ -703,7 +704,7 @@ export default function StudentAttendanceTracker() {
                 </p>
                 <p
                   className={`text-2xl font-bold ${getAttendanceColor(
-                    insights.last7DaysPercentage
+                    insights.last7DaysPercentage,
                   )}`}
                 >
                   {insights.last7DaysPercentage.toFixed(1)}%
@@ -711,12 +712,12 @@ export default function StudentAttendanceTracker() {
               </div>
               <div
                 className={`p-3 rounded-full ${getAttendanceBgColor(
-                  insights.last7DaysPercentage
+                  insights.last7DaysPercentage,
                 )}`}
               >
                 <CalendarDays
                   className={`h-6 w-6 ${getAttendanceColor(
-                    insights.last7DaysPercentage
+                    insights.last7DaysPercentage,
                   )}`}
                 />
               </div>
@@ -859,7 +860,7 @@ export default function StudentAttendanceTracker() {
                     ></div>
                   </div>
                 </Card>
-              )
+              ),
             )}
           </div>
         </CardContent>
@@ -953,11 +954,11 @@ export default function StudentAttendanceTracker() {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                     {(() => {
                       const subjectDetails = getSubjectAttendanceDetails(
-                        selectedSubjectForDetail
+                        selectedSubjectForDetail,
                       );
                       const totalClasses = subjectDetails.length;
                       const presentCount = subjectDetails.filter(
-                        (record) => record.status === "present"
+                        (record) => record.status === "present",
                       ).length;
                       const absentCount = totalClasses - presentCount;
                       const percentage =
@@ -1037,7 +1038,7 @@ export default function StudentAttendanceTracker() {
                             </div>
                           </div>
                         </div>
-                      )
+                      ),
                     )}
 
                     {getSubjectAttendanceDetails(selectedSubjectForDetail)

@@ -144,4 +144,44 @@ router.delete("/:id", async (req: any, res: Response) => {
   }
 });
 
+// Seed default data (CR/Admin only)
+router.post("/seed-defaults", async (req: any, res: Response) => {
+  try {
+    if (req.user?.role !== "cr") {
+      return res.status(403).json({
+        success: false,
+        message: "Only CRs can seed data",
+      });
+    }
+
+    const { subjects, timetable } = await import("../data/seed_data");
+    const { TimetableSlot } = await import("../models/Timetable");
+
+    console.log("[Seed API] Clearing existing E1 data...");
+    await Subject.deleteMany({ section: "E1" });
+    await TimetableSlot.deleteMany({ section: "E1" });
+
+    console.log("[Seed API] Inserting default subjects...");
+    await Subject.insertMany(subjects);
+
+    console.log("[Seed API] Inserting default timetable...");
+    await TimetableSlot.insertMany(timetable);
+
+    res.json({
+      success: true,
+      message: "Database seeded with default E1 data",
+      stats: {
+        subjects: subjects.length,
+        timetable: timetable.length
+      }
+    });
+  } catch (error) {
+    console.error("[Subjects API] Error seeding data:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to seed data",
+    });
+  }
+});
+
 export default router;

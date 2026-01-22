@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { getApiUrl } from "@/lib/queryClient";
 import {
   Card,
   CardContent,
@@ -53,7 +54,7 @@ export const AttendanceSheetUploader: React.FC<
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [attendanceText, setAttendanceText] = useState<string>("");
   const [selectedDate, setSelectedDate] = useState<string>(
-    new Date().toISOString().split("T")[0]
+    new Date().toISOString().split("T")[0],
   );
   const [isUploading, setIsUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<UploadResponse | null>(null);
@@ -108,14 +109,14 @@ export const AttendanceSheetUploader: React.FC<
         formData.append("attendanceSheet", selectedFile);
         formData.append("overrideDate", selectedDate);
 
-        response = await fetch("/api/attendance/upload-sheet", {
+        response = await fetch(getApiUrl("/api/attendance/upload-sheet"), {
           method: "POST",
           body: formData,
           credentials: "include",
         });
       } else {
         // Text input method
-        response = await fetch("/api/attendance/upload-text", {
+        response = await fetch(getApiUrl("/api/attendance/upload-text"), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -165,7 +166,7 @@ export const AttendanceSheetUploader: React.FC<
 
     // Reset file input
     const fileInput = document.getElementById(
-      "attendance-file"
+      "attendance-file",
     ) as HTMLInputElement;
     if (fileInput) {
       fileInput.value = "";
@@ -381,7 +382,7 @@ export const AttendanceSheetUploader: React.FC<
                         {uploadResult.data.processingNotes.map(
                           (note, index) => (
                             <li key={index}>{note}</li>
-                          )
+                          ),
                         )}
                       </ul>
                     </details>
@@ -499,14 +500,14 @@ export const AttendanceSheetUploader: React.FC<
                   AI will automatically detect student names, subjects, and
                   present/absent status
                 </li>
-                <li>Students will be automatically matched with the database</li>
+                <li>
+                  Students will be automatically matched with the database
+                </li>
                 <li>
                   Supported formats: Excel (.xlsx, .xls), CSV, PDF, Images (JPG,
                   PNG), Word (.docx)
                 </li>
-                <li>
-                  Processing may take 1-2 minutes depending on file size
-                </li>
+                <li>Processing may take 1-2 minutes depending on file size</li>
               </ul>
             ) : (
               <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">

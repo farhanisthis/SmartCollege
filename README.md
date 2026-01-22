@@ -2,6 +2,21 @@
 
 A unified Express + Vite + React app. This README summarizes the actual, working folder structure and the key commands to run the app.
 
+## 🚨 Production Deployment Fix
+
+**Is your live site showing HTML errors instead of loading data?**
+
+📖 **See:** [QUICK_START.md](QUICK_START.md) - Fix it in 5 minutes!
+
+**Complete Documentation:**
+
+- 🚀 [QUICK_START.md](QUICK_START.md) - Fast 5-minute fix
+- 📋 [FIX_SUMMARY.md](FIX_SUMMARY.md) - What was fixed and why
+- 📚 [DEPLOYMENT_FIX.md](DEPLOYMENT_FIX.md) - Detailed deployment guide
+- 🧪 [test-api-connection.html](test-api-connection.html) - Test your backend connection
+
+---
+
 ## Quick Start
 
 - Development (auto-reload):
@@ -15,6 +30,7 @@ A unified Express + Vite + React app. This README summarizes the actual, working
 App serves on `http://localhost:10000` in both modes.
 
 If the port is busy:
+
 - `netstat -ano | findstr :10000`
 - `taskkill /F /PID <PID>`
 

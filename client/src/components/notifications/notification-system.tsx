@@ -14,6 +14,7 @@ import {
   Archive,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { getApiUrl } from "@/lib/queryClient";
 
 interface Notification {
   id: string;
@@ -44,7 +45,7 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({
   const fetchNotifications = async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/notifications");
+      const response = await fetch(getApiUrl("/api/notifications"));
       if (response.ok) {
         const data = await response.json();
         setNotifications(data);
@@ -139,7 +140,7 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({
           read: false,
           actionRequired: true,
           actionUrl: "/cr/assignments",
-        }
+        },
       );
     }
 
@@ -190,13 +191,13 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({
       });
 
       setNotifications((prev) =>
-        prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n))
+        prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n)),
       );
     } catch (error) {
       console.error("Error marking notification as read:", error);
       // Optimistically update for demo
       setNotifications((prev) =>
-        prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n))
+        prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n)),
       );
     }
   };
@@ -274,7 +275,7 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({
                 key={notification.id}
                 className={`${getNotificationColor(
                   notification.type,
-                  notification.priority
+                  notification.priority,
                 )} ${!notification.read ? "border-l-4" : "opacity-75"}`}
               >
                 <div className="flex items-start justify-between">
@@ -351,7 +352,7 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({
                 key={notification.id}
                 className={`p-4 rounded-lg border ${getNotificationColor(
                   notification.type,
-                  notification.priority
+                  notification.priority,
                 )} ${!notification.read ? "border-l-4" : "opacity-75"}`}
               >
                 <div className="flex items-start justify-between">
@@ -361,8 +362,8 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({
                         notification.priority === "urgent"
                           ? "bg-red-100"
                           : notification.priority === "high"
-                          ? "bg-orange-100"
-                          : "bg-blue-100"
+                            ? "bg-orange-100"
+                            : "bg-blue-100"
                       }`}
                     >
                       {getNotificationIcon(notification.type)}
@@ -375,8 +376,8 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({
                             notification.priority === "urgent"
                               ? "destructive"
                               : notification.priority === "high"
-                              ? "default"
-                              : "secondary"
+                                ? "default"
+                                : "secondary"
                           }
                           className="text-xs"
                         >

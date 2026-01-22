@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { getApiUrl } from "@/lib/queryClient";
 import {
   Dialog,
   DialogContent,
@@ -89,13 +90,13 @@ export default function Profile() {
   useEffect(() => {
     const loadProfileData = async () => {
       try {
-        const response = await fetch("/api/profile", {
+        const response = await fetch(getApiUrl("/api/profile"), {
           credentials: "include",
         });
 
         const contentType = response.headers.get("content-type");
         if (contentType && contentType.includes("application/json")) {
-           if (response.ok) {
+          if (response.ok) {
             const data: ProfileData = await response.json();
             setProfileData(data);
             setFormData({
@@ -108,18 +109,21 @@ export default function Profile() {
               year: data.user.year || "",
               rollNumber: data.user.rollNumber || "",
             });
-           } else {
-             console.error("Profile fetch failed with status:", response.status);
-             if (response.status === 401) {
-                  // Optional: Redirect to login or show clear message
-                  throw new Error("Session expired. Please log in again.");
-             }
-             throw new Error("Failed to load profile");
-           }
+          } else {
+            console.error("Profile fetch failed with status:", response.status);
+            if (response.status === 401) {
+              // Optional: Redirect to login or show clear message
+              throw new Error("Session expired. Please log in again.");
+            }
+            throw new Error("Failed to load profile");
+          }
         } else {
-           const text = await response.text();
-           console.error("Profile received non-JSON response:", text.substring(0, 500));
-           throw new Error("Expected JSON but received " + contentType);
+          const text = await response.text();
+          console.error(
+            "Profile received non-JSON response:",
+            text.substring(0, 500),
+          );
+          throw new Error("Expected JSON but received " + contentType);
         }
       } catch (error) {
         console.error("Error loading profile:", error);
@@ -144,7 +148,9 @@ export default function Profile() {
     fileInputRef.current?.click();
   };
 
-  const handleImageChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -162,7 +168,7 @@ export default function Profile() {
 
     setIsUploading(true);
     try {
-      const response = await fetch("/api/profile/picture", {
+      const response = await fetch(getApiUrl("/api/profile/picture"), {
         method: "POST",
         body: formData,
       });
@@ -207,7 +213,7 @@ export default function Profile() {
       }
 
       // Update other profile fields
-      const response = await fetch("/api/profile", {
+      const response = await fetch(getApiUrl("/api/profile"), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -259,7 +265,7 @@ export default function Profile() {
     }
 
     try {
-      const response = await fetch("/api/profile/username", {
+      const response = await fetch(getApiUrl("/api/profile/username"), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -288,12 +294,16 @@ export default function Profile() {
       console.error("Error updating username:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to update username. Please try again.",
+        description:
+          error.message || "Failed to update username. Please try again.",
         variant: "destructive",
       });
       // Revert username in form
       if (profileData) {
-        setFormData(prev => ({ ...prev, username: profileData.user.username }));
+        setFormData((prev) => ({
+          ...prev,
+          username: profileData.user.username,
+        }));
       }
     }
   };
@@ -319,7 +329,7 @@ export default function Profile() {
 
     setIsChangingPassword(true);
     try {
-      const response = await fetch("/api/profile/password", {
+      const response = await fetch(getApiUrl("/api/profile/password"), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -352,7 +362,8 @@ export default function Profile() {
       console.error("Error updating password:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to update password. Please try again.",
+        description:
+          error.message || "Failed to update password. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -408,9 +419,11 @@ export default function Profile() {
               </Button>
               <div className="flex items-center space-x-2">
                 <div className="bg-[#f54c4c] p-1.5 rounded-lg">
-                    <GraduationCap className="h-4 w-4 text-white" />
+                  <GraduationCap className="h-4 w-4 text-white" />
                 </div>
-                <h1 className="text-base font-black tracking-tight">Profile Settings</h1>
+                <h1 className="text-base font-black tracking-tight">
+                  Profile Settings
+                </h1>
               </div>
             </div>
             <div className="flex items-center space-x-2">
@@ -424,8 +437,8 @@ export default function Profile() {
                   >
                     Cancel
                   </Button>
-                  <Button 
-                    onClick={handleSave} 
+                  <Button
+                    onClick={handleSave}
                     disabled={isSaving}
                     className="bg-[#f54c4c] hover:bg-[#d43f3f] text-white rounded-2xl h-11 px-6 font-bold"
                   >
@@ -438,9 +451,9 @@ export default function Profile() {
                   </Button>
                 </>
               ) : (
-                <Button 
-                    onClick={() => setIsEditing(true)}
-                    className="bg-[#f54c4c] hover:bg-[#d43f3f] text-white rounded-2xl h-11 px-6 font-bold"
+                <Button
+                  onClick={() => setIsEditing(true)}
+                  className="bg-[#f54c4c] hover:bg-[#d43f3f] text-white rounded-2xl h-11 px-6 font-bold"
                 >
                   <Edit3 className="h-4 w-4 mr-2" />
                   Edit Profile
@@ -460,27 +473,31 @@ export default function Profile() {
                 <div className="flex flex-col items-center text-center">
                   <div className="relative">
                     <div className="w-24 h-24 rounded-full border-4 border-[#f54c4c] p-1 flex items-center justify-center relative">
-                        <input 
-                            type="file" 
-                            ref={fileInputRef} 
-                            onChange={handleImageChange}
-                            accept="image/*"
-                            className="hidden"
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleImageChange}
+                        accept="image/*"
+                        className="hidden"
+                      />
+                      <Avatar className="h-full w-full">
+                        <AvatarImage
+                          src={profileData.user.profilePicture || ""}
+                          alt={profileData.user.name}
+                          className="object-cover"
                         />
-                        <Avatar className="h-full w-full">
-                        <AvatarImage src={profileData.user.profilePicture || ""} alt={profileData.user.name} className="object-cover" />
                         <AvatarFallback className="text-2xl font-black bg-white text-[#f54c4c]">
-                            {profileData.user.name
+                          {profileData.user.name
                             ?.split(" ")
                             .map((n) => n[0])
                             .join("")}
                         </AvatarFallback>
-                        </Avatar>
-                        {isUploading && (
-                             <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center">
-                                 <Loader2 className="h-6 w-6 text-white animate-spin" />
-                             </div>
-                        )}
+                      </Avatar>
+                      {isUploading && (
+                        <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center">
+                          <Loader2 className="h-6 w-6 text-white animate-spin" />
+                        </div>
+                      )}
                     </div>
                     {isEditing && (
                       <Button
@@ -522,7 +539,7 @@ export default function Profile() {
                       Joined{" "}
                       {new Date(profileData.user.createdAt).toLocaleDateString(
                         "en-US",
-                        { month: "long", year: "numeric" }
+                        { month: "long", year: "numeric" },
                       )}
                     </span>
                   </div>
@@ -592,7 +609,12 @@ export default function Profile() {
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <Label htmlFor="name" className="text-[11px] font-black uppercase tracking-widest text-muted-foreground ml-2 mb-2 block">Full Name</Label>
+                      <Label
+                        htmlFor="name"
+                        className="text-[11px] font-black uppercase tracking-widest text-muted-foreground ml-2 mb-2 block"
+                      >
+                        Full Name
+                      </Label>
                       <Input
                         id="name"
                         value={formData.name}
@@ -604,7 +626,12 @@ export default function Profile() {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="username" className="text-[11px] font-black uppercase tracking-widest text-muted-foreground ml-2 mb-2 block">Username</Label>
+                      <Label
+                        htmlFor="username"
+                        className="text-[11px] font-black uppercase tracking-widest text-muted-foreground ml-2 mb-2 block"
+                      >
+                        Username
+                      </Label>
                       <Input
                         id="username"
                         value={formData.username}
@@ -700,7 +727,12 @@ export default function Profile() {
                           : "Never changed"}
                       </p>
                     </div>
-                    <Button variant="outline" onClick={() => setIsPasswordDialogOpen(true)}>Change Password</Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsPasswordDialogOpen(true)}
+                    >
+                      Change Password
+                    </Button>
                   </div>
                   <Separator />
                   <div className="flex justify-between items-center">
@@ -720,12 +752,16 @@ export default function Profile() {
       </div>
 
       {/* Password Change Dialog */}
-      <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
+      <Dialog
+        open={isPasswordDialogOpen}
+        onOpenChange={setIsPasswordDialogOpen}
+      >
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Change Password</DialogTitle>
             <DialogDescription>
-              Enter your current password and choose a new password (minimum 8 characters).
+              Enter your current password and choose a new password (minimum 8
+              characters).
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -736,7 +772,10 @@ export default function Profile() {
                 type="password"
                 value={passwordData.currentPassword}
                 onChange={(e) =>
-                  setPasswordData((prev) => ({ ...prev, currentPassword: e.target.value }))
+                  setPasswordData((prev) => ({
+                    ...prev,
+                    currentPassword: e.target.value,
+                  }))
                 }
                 placeholder="Enter current password"
               />
@@ -748,7 +787,10 @@ export default function Profile() {
                 type="password"
                 value={passwordData.newPassword}
                 onChange={(e) =>
-                  setPasswordData((prev) => ({ ...prev, newPassword: e.target.value }))
+                  setPasswordData((prev) => ({
+                    ...prev,
+                    newPassword: e.target.value,
+                  }))
                 }
                 placeholder="Enter new password (min 8 characters)"
               />
@@ -760,7 +802,10 @@ export default function Profile() {
                 type="password"
                 value={passwordData.confirmPassword}
                 onChange={(e) =>
-                  setPasswordData((prev) => ({ ...prev, confirmPassword: e.target.value }))
+                  setPasswordData((prev) => ({
+                    ...prev,
+                    confirmPassword: e.target.value,
+                  }))
                 }
                 placeholder="Confirm new password"
               />
